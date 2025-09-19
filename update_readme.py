@@ -122,6 +122,23 @@ def best_overall(df: pd.DataFrame) -> pd.Series:
     )
     return d.iloc[0]
 
+def _best_by_sort(df: pd.DataFrame) -> Optional[pd.Series]:
+    """Return best row using the same sort rule as best_overall (val_acc desc,
+    then params asc, val_loss asc, train_time asc)."""
+    if df is None or df.empty:
+        return None
+    d = df.copy()
+    d["val_acc"] = pd.to_numeric(d["val_acc"], errors="coerce")
+    d["params"] = pd.to_numeric(d["params"], errors="coerce")
+    d["val_loss"] = pd.to_numeric(d["val_loss"], errors="coerce")
+    d["train_time_sec"] = pd.to_numeric(d["train_time_sec"], errors="coerce")
+    d = d.sort_values(
+        by=["val_acc", "params", "val_loss", "train_time_sec"],
+        ascending=[False, True, True, True],
+        kind="mergesort"
+    )
+    return d.iloc[0] if len(d) else None
+
 
 def typical_param_count(df: pd.DataFrame) -> Optional[int]:
     vc = df["params"].dropna().astype(int).value_counts()
@@ -290,6 +307,138 @@ def prettify_label(exp: str) -> str:
     s = s.replace("_drop", " d")
 
     return s
+
+def build_dynamic_conclusions(df: pd.DataFrame) -> str:
+    """
+    Build a narrative Conclusions section directly from the CSV.
+    Mirrors the human-written summary:
+      - BN/Dropout importance (A vs others)
+      - Optimizer+scheduler highlights
+      - Batch-size sweep takeaways
+      - Activations block
+      - Best overall run (name + stats)
+      - Final takeaway with typical params
+    """
+    if df is None or df.empty:
+        return "## Conclusions\n\n_Results not available._\n"
+
+    d = df.copy()
+    # normalize types
+    for col in ("val_acc", "val_loss", "params", "epochs", "best_epoch", "train_time_sec", "batch_size"):
+        if col in d.columns:
+            d[col] = pd.to_numeric(d[col], errors="coerce")
+
+    # Overall best
+    best = _best_by_sort(d)
+    best_name = str(best.get("exp_name", "")) if best is not None else ""
+    best_acc = format_float(best.get("val_acc"), 2) if best is not None else ""
+    best_loss = format_float(best.get("val_loss"), 4) if best is not None else ""
+    best_params = f"{int(best['params']):,}" if (best is not None and not pd.isna(best.get('params'))) else ""
+    best_ep = str(int(best["best_epoch"])) if (best is not None and not pd.isna(best.get("best_epoch"))) else ""
+    best_epochs = str(int(best["epochs"])) if (best is not None and not pd.isna(best.get("epochs"))) else ""
+
+    # Typical params for the final line
+    tp = typical_param_count(d)
+    tp_str = f"≈{tp:,} parameters" if tp else "<20k parameters"
+
+    # ≥99.40% count (within ≤20 epochs if you want to enforce)
+    reached = d[(d["val_acc"] >= 99.40)]
+    n_reached = int(reached.shape[0]) if not reached.empty else 0
+
+    # Block splits by exp_name prefix
+    A = d[d["exp_name"].astype(str).str.startswith("A_")]
+    B = d[d["exp_name"].astype(str).str.startswith("B_")]
+    C = d[d["exp_name"].astype(str).str.startswith("C_")]
+    D = d[d["exp_name"].astype(str).str.startswith("D_")]
+
+    # A (baseline)
+    a_best = _best_by_sort(A) if not A.empty else None
+    a_acc = format_float(a_best.get("val_acc"), 2) if a_best is not None else None
+
+    # B (optimizers)
+    def _best_for(opt: str, sch: str) -> Optional[pd.Series]:
+        dd = B[(B["optimizer"].astype(str)==opt) & (B["scheduler"].astype(str)==sch)]
+        return _best_by_sort(dd) if not dd.empty else None
+
+    b_sgd_1cyc = _best_for("sgd", "onecycle")
+    b_adam_1cyc = _best_for("adam", "onecycle")
+    b_adamw_step = _best_for("adamw", "step")
+    b_rms_plateau = _best_for("rmsprop", "plateau")
+
+    # C (batch sizes)
+    c_best = _best_by_sort(C) if not C.empty else None
+    # best batch size by peak val_acc (tie break by same rule)
+    best_bs = None
+    if not C.empty:
+        # take best per batch_size
+        per_bs = []
+        for bs, grp in C.groupby("batch_size"):
+            row = _best_by_sort(grp)
+            if row is not None:
+                per_bs.append(row)
+        if per_bs:
+            per_bs_df = pd.DataFrame(per_bs)
+            row_bs = _best_by_sort(per_bs_df)
+            if row_bs is not None and not pd.isna(row_bs.get("batch_size")):
+                best_bs = int(row_bs["batch_size"])
+
+    # D (activations)
+    d_best = _best_by_sort(D) if not D.empty else None
+    # highlight best activation under D_
+    d_act = str(d_best.get("activation")) if d_best is not None else None
+    d_acc = format_float(d_best.get("val_acc"), 2) if d_best is not None else None
+
+    # Compose narrative bullets
+    bullets = []
+
+    # BN + Dropout importance
+    if a_acc is not None:
+        bullets.append(f"- **BN + Dropout are critical:** the baseline (A) peaked at **{a_acc}%**, while BN/Dropout runs exceeded **99.4%** ({n_reached} runs).")
+    else:
+        bullets.append("- **BN + Dropout are critical:** BN/Dropout runs exceeded **99.4%** in multiple cases; the no-BN/Dropout baseline was not competitive.")
+
+    # Optimizers highlight
+    opt_lines = []
+    if b_adam_1cyc is not None:
+        opt_lines.append(f"**Adam + OneCycleLR** up to **{format_float(b_adam_1cyc['val_acc'], 2)}%**")
+    if b_adamw_step is not None:
+        opt_lines.append(f"**AdamW + StepLR** up to **{format_float(b_adamw_step['val_acc'], 2)}%**")
+    if b_sgd_1cyc is not None:
+        opt_lines.append(f"**SGD + OneCycleLR** up to **{format_float(b_sgd_1cyc['val_acc'], 2)}%**")
+    if b_rms_plateau is not None:
+        opt_lines.append(f"**RMSprop + ReduceLROnPlateau** around **{format_float(b_rms_plateau['val_acc'], 2)}%**")
+
+    if opt_lines:
+        bullets.append("- **Optimizers:** " + "; ".join(opt_lines) + ".")
+    else:
+        bullets.append("- **Optimizers:** Adaptive methods (Adam/AdamW) and SGD+OneCycleLR were generally strong; RMSprop lagged.")
+
+    # Batch-size sweep takeaway
+    if best_bs is not None and c_best is not None:
+        bullets.append(f"- **Batch-size sweep (C):** best results clustered at **bs={best_bs}**, with the top C-run reaching **{format_float(c_best['val_acc'], 2)}%**.")
+    elif c_best is not None:
+        bullets.append(f"- **Batch-size sweep (C):** top C-run reached **{format_float(c_best['val_acc'], 2)}%**.")
+    else:
+        bullets.append("- **Batch-size sweep (C):** results not available.")
+
+    # Activations
+    if d_act is not None and d_acc is not None:
+        bullets.append(f"- **Activations (D):** differences were modest on MNIST; best was **{d_act}** at **{d_acc}%** (under AdamW+StepLR).")
+    else:
+        bullets.append("- **Activations (D):** differences were modest on MNIST.")
+
+    # Final takeaway / best run
+    if best is not None:
+        bullets.append(
+            f"- **Best overall:** `{best_name}` → **{best_acc}%** (val loss **{best_loss}**) "
+            f"by epoch **{best_ep}** / {best_epochs}, **{best_params}** params."
+        )
+        bullets.append(
+            f"- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, "
+            f"TinyMNISTNet ({tp_str}) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **{best_acc}%**."
+        )
+
+    return "## Conclusions\n\n" + "\n".join(bullets) + "\n"
 
 
 def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
@@ -832,15 +981,17 @@ python update_readme.py
     tp = typical_param_count(df)
     tp_str = f"**≈{tp:,} parameters total**" if tp else "**<20k parameters total**"
 
-    conclusions = (
-        "## Conclusions\n\n"
-        "- **BN + Dropout** are critical under a tight parameter budget.\n"
-        "- **AdamW + StepLR** and **SGD + OneCycleLR** typically converge to strong accuracy within few epochs.\n"
-        "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
-        "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
-        "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
-        f"- The full model stays within {tp_str}, thanks to the **1×1 Conv + GAP** head that replaces a large fully connected layer.\n"
-    )
+    # conclusions = (
+    #     "## Conclusions\n\n"
+    #     "- **BN + Dropout** are critical under a tight parameter budget.\n"
+    #     "- **AdamW + StepLR** and **SGD + OneCycleLR** typically converge to strong accuracy within few epochs.\n"
+    #     "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
+    #     "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
+    #     "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
+    #     f"- The full model stays within {tp_str}, thanks to the **1×1 Conv + GAP** head that replaces a large fully connected layer.\n"
+    # )
+    conclusions = build_dynamic_conclusions(df_sorted)
+
 
     reproduce = (
         "## Reproduce\n\n"
