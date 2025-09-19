@@ -183,18 +183,31 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ---
 
-## Learning Curves & Diagnostics (All Experiments)
+## Combined Learning Curves (All Experiments)
+
+**Validation Accuracy (All Experiments):**
+
+![](results/plots/combined_val_accuracy.png)
+
+**Validation Loss (All Experiments):**
+
+![](results/plots/combined_val_loss.png)
+
+**Training Accuracy (All Experiments):**
+
+![](results/plots/combined_train_accuracy.png)
+
+**Training Loss (All Experiments):**
+
+![](results/plots/combined_train_loss.png)
+
+
+---
+
+## Learning Curves & Diagnostics (Per Experiment)
 
 
 ### `C_bs_sweep_sgd_onecycle_bs32`
-
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs32_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs32_loss.png)
 
 **Confusion Matrix:**
 
@@ -209,14 +222,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_adam_onecycle_bs32`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs32_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs32_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_adam_onecycle_bs32_cm.png)
@@ -229,14 +234,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `C_bs_sweep_adam_onecycle_bs128`
-
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs128_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs128_loss.png)
 
 **Confusion Matrix:**
 
@@ -251,14 +248,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_adamw_step_bs128`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs128_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs128_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_adamw_step_bs128_cm.png)
@@ -271,14 +260,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `C_bs_sweep_sgd_onecycle_bs64`
-
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs64_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs64_loss.png)
 
 **Confusion Matrix:**
 
@@ -293,14 +274,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_adam_onecycle_bs64`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs64_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adam_onecycle_bs64_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_adam_onecycle_bs64_cm.png)
@@ -313,14 +286,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `D_activation_silu`
-
-**Accuracy:**
-
-![](results/plots/D_activation_silu_acc.png)
-
-**Loss:**
-
-![](results/plots/D_activation_silu_loss.png)
 
 **Confusion Matrix:**
 
@@ -335,14 +300,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_adamw_step_bs32`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs32_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs32_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_adamw_step_bs32_cm.png)
@@ -355,14 +312,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `C_bs_sweep_adamw_step_bs64`
-
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs64_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_adamw_step_bs64_loss.png)
 
 **Confusion Matrix:**
 
@@ -377,14 +326,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_sgd_onecycle_bs128`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs128_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_sgd_onecycle_bs128_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_sgd_onecycle_bs128_cm.png)
@@ -397,14 +338,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `B_bn_do_sgd_onecycle`
-
-**Accuracy:**
-
-![](results/plots/B_bn_do_sgd_onecycle_acc.png)
-
-**Loss:**
-
-![](results/plots/B_bn_do_sgd_onecycle_loss.png)
 
 **Confusion Matrix:**
 
@@ -419,14 +352,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `B_bn_do_adam_onecycle`
 
-**Accuracy:**
-
-![](results/plots/B_bn_do_adam_onecycle_acc.png)
-
-**Loss:**
-
-![](results/plots/B_bn_do_adam_onecycle_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/B_bn_do_adam_onecycle_cm.png)
@@ -439,14 +364,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `B_bn_do_adamw_step`
-
-**Accuracy:**
-
-![](results/plots/B_bn_do_adamw_step_acc.png)
-
-**Loss:**
-
-![](results/plots/B_bn_do_adamw_step_loss.png)
 
 **Confusion Matrix:**
 
@@ -461,14 +378,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `B_bn_do_rmsprop_plateau`
 
-**Accuracy:**
-
-![](results/plots/B_bn_do_rmsprop_plateau_acc.png)
-
-**Loss:**
-
-![](results/plots/B_bn_do_rmsprop_plateau_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/B_bn_do_rmsprop_plateau_cm.png)
@@ -481,14 +390,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `D_activation_relu`
-
-**Accuracy:**
-
-![](results/plots/D_activation_relu_acc.png)
-
-**Loss:**
-
-![](results/plots/D_activation_relu_loss.png)
 
 **Confusion Matrix:**
 
@@ -503,14 +404,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_rmsprop_plateau_bs64`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_cm.png)
@@ -523,14 +416,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `C_bs_sweep_rmsprop_plateau_bs32`
-
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_loss.png)
 
 **Confusion Matrix:**
 
@@ -545,14 +430,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `D_activation_gelu`
 
-**Accuracy:**
-
-![](results/plots/D_activation_gelu_acc.png)
-
-**Loss:**
-
-![](results/plots/D_activation_gelu_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/D_activation_gelu_cm.png)
@@ -566,14 +443,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ### `C_bs_sweep_rmsprop_plateau_bs128`
 
-**Accuracy:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_acc.png)
-
-**Loss:**
-
-![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_loss.png)
-
 **Confusion Matrix:**
 
 ![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_cm.png)
@@ -586,14 +455,6 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 
 ### `A_noBN_noDO_vanillaGD`
-
-**Accuracy:**
-
-![](results/plots/A_noBN_noDO_vanillaGD_acc.png)
-
-**Loss:**
-
-![](results/plots/A_noBN_noDO_vanillaGD_loss.png)
 
 **Confusion Matrix:**
 

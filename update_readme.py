@@ -14,17 +14,21 @@ What this script does:
 - Builds a rich README.md that includes:
   * Static intro (cleaned sentence + code-fenced folder structure).
   * Objective.
-  * Model: TinyMNISTNet (architecture block + notes; shows typical total params from CSV).
+  * Model: TinyMNISTNet (detailed architecture, shape evolution, parameter table; dynamic last_channels).
   * Experiment Design with explanations (LR, OneCycleLR, StepLR, ReduceLROnPlateau;
     how optimizers update weights; activation functions overview).
   * Best Result (So Far).
   * Full Results table ONLY (sorted by val_acc desc, then fewer params, then lower val_loss, then train_time_sec).
-    The sorting basis is explicitly stated.
-  * Learning Curves & Diagnostics for ALL experiments (not only top runs).
-    For each run, it tries to embed Accuracy/Loss/CM/Misclassified images; otherwise prints a small missing note.
+  * NEW: Combined Learning Curves (All Experiments): generates and embeds single plots that compare
+         all experiments' validation accuracy and validation loss (and training metrics if available).
+  * Learning Curves & Diagnostics for ALL experiments (per-run images if present).
     Also links per-epoch CSV if present.
 
-Requirements: pandas (and Python stdlib only)
+Notes:
+- This script now uses matplotlib (Agg backend) to generate combined plots.
+- POSIX-normalizes paths in README so GitHub renders images correctly.
+
+Requirements: pandas, matplotlib (and Python stdlib only)
 Windows-friendly: no GUI ops; file I/O only.
 """
 
@@ -32,14 +36,24 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 import pandas as pd
 
+# Use non-GUI backend for matplotlib
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+SHOW_PER_RUN_ACCURACY = False
+SHOW_PER_RUN_LOSS = False
+SHOW_PER_RUN_CM = True
+SHOW_PER_RUN_MISCLS = True
 # ---------- Paths & Expected Schema ----------
 REPO_ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = REPO_ROOT / "results"
 RESULTS_CSV = RESULTS_DIR / "results.csv"
+PLOTS_DIR = RESULTS_DIR / "plots"
 README_MD = REPO_ROOT / "README.md"
 
 # Exact, latest schema (21 columns), left-to-right:
@@ -159,7 +173,7 @@ def make_table(df: pd.DataFrame, columns: List[str]) -> str:
             if pd.isna(v):
                 v = ""
             vals.append(str(v))
-        lines.append("| " + " | ".join(vals) + " |")
+        lines.append("| " + " " .join(vals).replace(" ", " | ") + " |")  # keep alignment
     return "\n".join(lines)
 
 
@@ -179,6 +193,128 @@ def format_for_display(d: pd.DataFrame) -> pd.DataFrame:
     if "lr" in out:
         out["lr"] = out["lr"].apply(lambda x: "" if pd.isna(x) else format_float(x, 5))
     return out
+
+
+# ---------- Combined Plotting ----------
+def _read_epoch_csv(path_str: str) -> Optional[pd.DataFrame]:
+    """
+    Read a per-epoch CSV robustly. Returns a DataFrame or None.
+    Tries to coerce common column names for epochs, accuracy, loss (train/val).
+    """
+    if not path_str:
+        return None
+    p = REPO_ROOT / path_str
+    if not p.exists():
+        return None
+    try:
+        df_ep = pd.read_csv(p)
+    except Exception:
+        return None
+
+    # Standardize column names (lowercase, strip)
+    df_ep.columns = [c.strip().lower() for c in df_ep.columns]
+
+    # Ensure an epoch column exists; if not, create a 1..N index
+    if "epoch" not in df_ep.columns:
+        df_ep["epoch"] = range(1, len(df_ep) + 1)
+
+    return df_ep
+
+
+def _pick_col(df_ep: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+    for c in candidates:
+        if c in df_ep.columns:
+            return c
+    return None
+
+
+def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
+    """
+    Generate combined plots for:
+      - validation accuracy vs. epoch (all experiments)
+      - validation loss vs. epoch (all experiments)
+    If training metrics exist, also generate:
+      - training accuracy vs. epoch
+      - training loss vs. epoch
+
+    Returns dict of generated image relative paths.
+    """
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Paths to save combined images
+    out_paths: Dict[str, str] = {
+        "val_acc": _to_posix((PLOTS_DIR / "combined_val_accuracy.png").relative_to(REPO_ROOT).as_posix()),
+        "val_loss": _to_posix((PLOTS_DIR / "combined_val_loss.png").relative_to(REPO_ROOT).as_posix()),
+        "train_acc": _to_posix((PLOTS_DIR / "combined_train_accuracy.png").relative_to(REPO_ROOT).as_posix()),
+        "train_loss": _to_posix((PLOTS_DIR / "combined_train_loss.png").relative_to(REPO_ROOT).as_posix()),
+    }
+
+    # Accumulate series
+    series_val_acc: List[Tuple[str, pd.Series, pd.Series]] = []   # (label, epoch, val_acc)
+    series_val_loss: List[Tuple[str, pd.Series, pd.Series]] = []  # (label, epoch, val_loss)
+    series_tr_acc: List[Tuple[str, pd.Series, pd.Series]] = []
+    series_tr_loss: List[Tuple[str, pd.Series, pd.Series]] = []
+
+    for _, r in df.iterrows():
+        label = str(r.get("exp_name", ""))
+        epoch_csv = str(r.get("epoch_csv", ""))
+        ep_df = _read_epoch_csv(epoch_csv)
+        if ep_df is None:
+            continue
+
+        # Identify columns
+        epoch_col = "epoch"
+        val_acc_col = _pick_col(ep_df, ["val_acc", "val_accuracy", "valid_acc", "valid_accuracy"])
+        val_loss_col = _pick_col(ep_df, ["val_loss", "valid_loss"])
+        tr_acc_col = _pick_col(ep_df, ["train_acc", "accuracy", "acc"])  # beware: 'accuracy' might be train in some logs
+        tr_loss_col = _pick_col(ep_df, ["train_loss", "loss"])           # 'loss' alone likely train loss
+
+        # Collect series if present
+        if val_acc_col and pd.api.types.is_numeric_dtype(ep_df[val_acc_col]):
+            series_val_acc.append((label, ep_df[epoch_col], ep_df[val_acc_col]))
+        if val_loss_col and pd.api.types.is_numeric_dtype(ep_df[val_loss_col]):
+            series_val_loss.append((label, ep_df[epoch_col], ep_df[val_loss_col]))
+        if tr_acc_col and pd.api.types.is_numeric_dtype(ep_df[tr_acc_col]):
+            series_tr_acc.append((label, ep_df[epoch_col], ep_df[tr_acc_col]))
+        if tr_loss_col and pd.api.types.is_numeric_dtype(ep_df[tr_loss_col]):
+            series_tr_loss.append((label, ep_df[epoch_col], ep_df[tr_loss_col]))
+
+    # Helper to plot lists
+    def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
+        if not series_list:
+            return False
+        plt.figure()
+        for label, x, y in series_list:
+            try:
+                plt.plot(x.values, y.values, label=label)
+            except Exception:
+                continue
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.legend(loc="best", fontsize="small", ncol=1)
+        plt.grid(True, alpha=0.3)
+        # Save
+        out_file = REPO_ROOT / save_as
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(out_file, dpi=150)
+        plt.close()
+        return True
+
+    # Generate plots
+    has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (All Experiments)", "Epoch", "Val Accuracy", out_paths["val_acc"])
+    has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (All Experiments)", "Epoch", "Val Loss", out_paths["val_loss"])
+    has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (All Experiments)",  "Epoch", "Train Accuracy", out_paths["train_acc"])
+    has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (All Experiments)",      "Epoch", "Train Loss", out_paths["train_loss"])
+
+    # Only return those that were actually generated
+    generated = {}
+    if has_val_acc: generated["val_acc"] = out_paths["val_acc"]
+    if has_val_loss: generated["val_loss"] = out_paths["val_loss"]
+    if has_tr_acc: generated["train_acc"] = out_paths["train_acc"]
+    if has_tr_loss: generated["train_loss"] = out_paths["train_loss"]
+    return generated
 
 
 # ---------- README Builder ----------
@@ -228,21 +364,18 @@ python update_readme.py
         "(MNIST 10k test set used as validation; training split is 50k).\n"
     )
 
-    # Model section (architecture block + typical params)
+    # ----- Model section (dynamic param table, dynamic last_channels) -----
     typical_params = typical_param_count(df)
     typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
 
-    # Estimate last_channels dynamically
-    # Rough heuristic: from params count, deduce likely last_channels (default 32)
-    # But we can safely assume 32 if CSV doesn’t vary
+    # Estimate last_channels dynamically (default 32)
     last_ch = 32
     try:
         if not df.empty:
-            # read model_variant or last conv channels from params if available
             if "model_variant" in df.columns:
                 mv = df["model_variant"].dropna().astype(str)
                 if len(mv) > 0 and mv.str.contains("last=").any():
-                    last_ch = int(mv.str.extract(r"last=(\d+)").dropna().iloc[0,0])
+                    last_ch = int(mv.str.extract(r"last=(\d+)").dropna().iloc[0, 0])
     except Exception:
         last_ch = 32
 
@@ -311,88 +444,6 @@ python update_readme.py
         f"{typical_line}"
     )
 
-    # typical_params = typical_param_count(df)
-    # typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
-
-    # model = (
-    #     "## Model: TinyMNISTNet\n\n"
-    #     "TinyMNISTNet is a deliberately compact CNN designed for MNIST digits.  \n"
-    #     "It enforces three constraints: **<20k parameters**, **≤20 epochs**, and **≥99.4% accuracy**.\n\n"
-    #     "---\n\n"
-    #     "### Architecture\n\n"
-    #     "```text\n"
-    #     "Input  : [B, 1, 28, 28]\n\n"
-    #     "Conv1  : 1  →  8   (3×3, pad=1)   → [B, 8, 28, 28]\n"
-    #     "Conv2  : 8  → 12   (3×3, pad=1)   → [B, 12, 28, 28]\n"
-    #     "Pool   : 2×2                         [B, 12, 14, 14]\n\n"
-    #     "Conv3  : 12 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
-    #     "Conv4  : 16 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
-    #     "Pool   : 2×2                         [B, 16,  7,  7]\n\n"
-    #     "Conv5  : 16 → 24  (3×3, pad=1)   → [B, 24,  7,  7]\n"
-    #     "Conv6  : 24 → 32  (3×3, pad=1)   → [B, 32,  7,  7]\n\n"
-    #     "Conv1×1: 32 → 10   (1×1)          → [B, 10,  7,  7]\n"
-    #     "GAP    : 7×7 → 1×1                → [B, 10,  1,  1]\n"
-    #     "Flatten → [B, 10]\n"
-    #     "Softmax → class probabilities\n"
-    #     "```\n\n"
-    #     "---\n\n"
-    #     "### Shape Evolution\n\n"
-    #     "- Start: `1×28×28`\n"
-    #     "- After Conv/Pool blocks: `32×7×7`\n"
-    #     "- 1×1 Conv: `32→10`, output `10×7×7`\n"
-    #     "- GAP: average each map → `[10]`\n"
-    #     "- Softmax: probabilities over 10 digits\n\n"
-    #     "---\n\n"
-    #     "### Why 1×1 Conv + GAP?\n\n"
-    #     "- Flattening `32×7×7 = 1568` features with a dense layer → ~15k params.\n"
-    #     "- Instead: **1×1 conv (32→10)** needs only 320 weights + biases.\n"
-    #     "- GAP has no parameters, just averages.\n"
-    #     "- Result: <20k params total, less overfitting, faster convergence.\n\n"
-    #     "---\n\n"
-    #     "### Parameter Count (default last_channels=32)\n\n"
-    #     "| Layer       | In→Out Channels | Kernel | Params |\n"
-    #     "|-------------|-----------------|--------|--------|\n"
-    #     "| Conv1       | 1 → 8           | 3×3    |   80   |\n"
-    #     "| Conv2       | 8 → 12          | 3×3    |  876   |\n"
-    #     "| Conv3       | 12 → 16         | 3×3    | 1,744  |\n"
-    #     "| Conv4       | 16 → 16         | 3×3    | 2,320  |\n"
-    #     "| Conv5       | 16 → 24         | 3×3    | 3,480  |\n"
-    #     "| Conv6       | 24 → 32         | 3×3    | 6,944  |\n"
-    #     "| Conv1×1     | 32 → 10         | 1×1    |   330  |\n"
-    #     "| **Total**   |                 |        | **15,774** |\n\n"
-    #     f"{typical_line}"
-    # )
-
-#     typical_params = typical_param_count(df)
-#     typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
-#     # Architecture block (TinyMNISTNet design)
-#     architecture_block = """```text
-# Input  : 1×28×28
-
-# Conv   : 1 → C1, 3×3, pad=1     (Act)
-# Conv   : C1 → C2, 3×3, pad=1    (Act)
-# Pool   : 2×2                     (28→14)
-
-# Conv   : C2 → C3, 3×3, pad=1    (Act)
-# Conv   : C3 → C4, 3×3, pad=1    (Act)
-# Pool   : 2×2                     (14→7)
-
-# Conv1×1: C4 → 10
-# GAP    : 7×7 → 1×1
-# Softmax: 10
-# ```"""
-
-#     model = (
-#         "## Model: TinyMNISTNet\n\n"
-#         "- Compact CNN using only **3×3 convs**, two **MaxPools** (spatial: `28→14→7`).\n"
-#         "- A **1×1 conv** + **Global Average Pooling (GAP)** head replaces large fully-connected layers.\n"
-#         "- **BatchNorm**/**Dropout** optional; activations tried: **ReLU**, **SiLU**, **GELU**.\n"
-#         f"{typical_line}"
-#         "- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.\n\n"
-#         "### Architecture\n\n"
-#         f"{architecture_block}\n"
-#     )
-
     # Experiment Design (explanations)
     design = (
         "## Experiment Design\n\n"
@@ -456,8 +507,31 @@ python update_readme.py
         f"{full_table}\n"
     )
 
-    # Learning Curves & Diagnostics for ALL experiments
-    diags = ["## Learning Curves & Diagnostics (All Experiments)\n"]
+    # ---------- NEW: Combined Learning Curves section ----------
+    # Generate combined plots from per-epoch CSVs (if present)
+    combined = generate_combined_plots(df_sorted)
+
+    combined_md_parts = ["## Combined Learning Curves (All Experiments)\n"]
+    if "val_acc" in combined:
+        combined_md_parts.append(md_image_or_note("Validation Accuracy (All Experiments)", combined["val_acc"]))
+    else:
+        combined_md_parts.append("_Validation accuracy curves could not be generated (no per-epoch CSVs with a recognized `val_acc`)._\n")
+
+    if "val_loss" in combined:
+        combined_md_parts.append(md_image_or_note("Validation Loss (All Experiments)", combined["val_loss"]))
+    else:
+        combined_md_parts.append("_Validation loss curves could not be generated (no per-epoch CSVs with a recognized `val_loss`)._\n")
+
+    # If training metrics were also found, include them
+    if "train_acc" in combined:
+        combined_md_parts.append(md_image_or_note("Training Accuracy (All Experiments)", combined["train_acc"]))
+    if "train_loss" in combined:
+        combined_md_parts.append(md_image_or_note("Training Loss (All Experiments)", combined["train_loss"]))
+
+    combined_md = "\n".join(combined_md_parts)
+
+    # Learning Curves & Diagnostics for ALL experiments (per-run images if present)
+    diags = ["## Learning Curves & Diagnostics (Per Experiment)\n"]
     for _, r in df_sorted.iterrows():
         exp = str(r.get("exp_name", ""))
         acc_plot = str(r.get("acc_plot", ""))
@@ -467,10 +541,14 @@ python update_readme.py
         epoch_csv = str(r.get("epoch_csv", ""))
 
         block = [f"### `{exp}`\n"]
-        block.append(md_image_or_note("Accuracy", acc_plot))
-        block.append(md_image_or_note("Loss", loss_plot))
-        block.append(md_image_or_note("Confusion Matrix", cm_plot))
-        block.append(md_image_or_note("Misclassified Samples", mis_plot))
+        if SHOW_PER_RUN_ACCURACY:
+            block.append(md_image_or_note("Accuracy", acc_plot))
+        if SHOW_PER_RUN_LOSS:
+            block.append(md_image_or_note("Loss", loss_plot))
+        if SHOW_PER_RUN_CM:
+            block.append(md_image_or_note("Confusion Matrix", cm_plot))
+        if SHOW_PER_RUN_MISCLS:
+            block.append(md_image_or_note("Misclassified Samples", mis_plot))
 
         if epoch_csv and file_exists(epoch_csv):
             block.append(f"- Per-epoch CSV: `{_to_posix(epoch_csv)}`\n")
@@ -482,6 +560,30 @@ python update_readme.py
 
     diagnostics_md = "\n\n".join(diags)
 
+    # diags = ["## Learning Curves & Diagnostics (Per Experiment)\n"]
+    # for _, r in df_sorted.iterrows():
+    #     exp = str(r.get("exp_name", ""))
+    #     acc_plot = str(r.get("acc_plot", ""))
+    #     loss_plot = str(r.get("loss_plot", ""))
+    #     cm_plot = str(r.get("cm_plot", ""))
+    #     mis_plot = str(r.get("miscls_plot", ""))
+    #     epoch_csv = str(r.get("epoch_csv", ""))
+
+    #     block = [f"### `{exp}`\n"]
+    #     block.append(md_image_or_note("Accuracy", acc_plot))
+    #     block.append(md_image_or_note("Loss", loss_plot))
+    #     block.append(md_image_or_note("Confusion Matrix", cm_plot))
+    #     block.append(md_image_or_note("Misclassified Samples", mis_plot))
+
+    #     if epoch_csv and file_exists(epoch_csv):
+    #         block.append(f"- Per-epoch CSV: `{_to_posix(epoch_csv)}`\n")
+    #     else:
+    #         missing = _to_posix(epoch_csv) if epoch_csv else "(not provided)"
+    #         block.append(f"- Per-epoch CSV: _Missing at '{missing}'_\n")
+
+    #     diags.append("\n".join(block))
+
+    # diagnostics_md = "\n\n".join(diags)
 
     # Use the most common param count for dynamic reporting
     tp = typical_param_count(df)
@@ -496,17 +598,6 @@ python update_readme.py
         "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
         f"- The full model stays within {tp_str}, thanks to the **1×1 Conv + GAP** head that replaces a large fully connected layer.\n"
     )
-
-
-
-    # conclusions = (
-    #     "## Conclusions\n\n"
-    #     "- **BN + Dropout** are critical under a tight parameter budget.\n"
-    #     "- **AdamW + StepLR** and **SGD + OneCycleLR** typically converge to strong accuracy within few epochs.\n"
-    #     "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
-    #     "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
-    #     "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
-    # )
 
     reproduce = (
         "## Reproduce\n\n"
@@ -530,6 +621,8 @@ python update_readme.py
         best_md,
         SECTION_DIVIDER,
         results_md,
+        SECTION_DIVIDER,
+        combined_md,
         SECTION_DIVIDER,
         diagnostics_md,
         SECTION_DIVIDER,
