@@ -259,17 +259,17 @@ python update_readme.py
     conv1x1_p = conv_params(last_ch, 10, 1)
     total_p = conv1_p + conv2_p + conv3_p + conv4_p + conv5_p + conv6_p + conv1x1_p
 
-    param_table =   f"""| Layer       | In→Out Channels | Kernel | Params |
-                        |-------------|-----------------|--------|--------|
-                        | Conv1       | 1 → 8           | 3×3    | {conv1_p:,} |
-                        | Conv2       | 8 → 12          | 3×3    | {conv2_p:,} |
-                        | Conv3       | 12 → 16         | 3×3    | {conv3_p:,} |
-                        | Conv4       | 16 → 16         | 3×3    | {conv4_p:,} |
-                        | Conv5       | 16 → 24         | 3×3    | {conv5_p:,} |
-                        | Conv6       | 24 → {last_ch}  | 3×3    | {conv6_p:,} |
-                        | Conv1×1     | {last_ch} → 10  | 1×1    | {conv1x1_p:,} |
-                        | **Total**   |                 |        | **{total_p:,}** |
-                        """
+    param_table = f"""| Layer       | In→Out Channels | Kernel | Params |
+|-------------|-----------------|--------|--------|
+| Conv1       | 1 → 8           | 3×3    | {conv1_p:,} |
+| Conv2       | 8 → 12          | 3×3    | {conv2_p:,} |
+| Conv3       | 12 → 16         | 3×3    | {conv3_p:,} |
+| Conv4       | 16 → 16         | 3×3    | {conv4_p:,} |
+| Conv5       | 16 → 24         | 3×3    | {conv5_p:,} |
+| Conv6       | 24 → {last_ch}  | 3×3    | {conv6_p:,} |
+| Conv1×1     | {last_ch} → 10  | 1×1    | {conv1x1_p:,} |
+| **Total**   |                 |        | **{total_p:,}** |
+"""
 
     model = (
         "## Model: TinyMNISTNet\n\n"
