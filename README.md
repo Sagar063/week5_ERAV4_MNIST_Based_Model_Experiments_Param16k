@@ -44,29 +44,68 @@ python update_readme.py
 
 ## Model: TinyMNISTNet
 
-- Compact CNN using only **3×3 convs**, two **MaxPools** (spatial: `28→14→7`).
-- A **1×1 conv** + **Global Average Pooling (GAP)** head replaces large fully-connected layers.
-- **BatchNorm**/**Dropout** optional; activations tried: **ReLU**, **SiLU**, **GELU**.
-- **Typical total parameters (most common across runs):** ~15,882
-- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.
+TinyMNISTNet is a deliberately compact CNN designed for MNIST digits.  
+It enforces three constraints: **<20k parameters**, **≤20 epochs**, and **≥99.4% accuracy**.
+
+---
 
 ### Architecture
 
 ```text
-Input  : 1×28×28
+Input  : [B, 1, 28, 28]
 
-Conv   : 1 → C1, 3×3, pad=1     (Act)
-Conv   : C1 → C2, 3×3, pad=1    (Act)
-Pool   : 2×2                     (28→14)
+Conv1  : 1  →  8   (3×3, pad=1)   → [B, 8, 28, 28]
+Conv2  : 8  → 12   (3×3, pad=1)   → [B, 12, 28, 28]
+Pool   : 2×2                         [B, 12, 14, 14]
 
-Conv   : C2 → C3, 3×3, pad=1    (Act)
-Conv   : C3 → C4, 3×3, pad=1    (Act)
-Pool   : 2×2                     (14→7)
+Conv3  : 12 → 16  (3×3, pad=1)   → [B, 16, 14, 14]
+Conv4  : 16 → 16  (3×3, pad=1)   → [B, 16, 14, 14]
+Pool   : 2×2                         [B, 16,  7,  7]
 
-Conv1×1: C4 → 10
-GAP    : 7×7 → 1×1
-Softmax: 10
+Conv5  : 16 → 24  (3×3, pad=1)   → [B, 24,  7,  7]
+Conv6  : 24 → 32  (3×3, pad=1)   → [B, 32,  7,  7]
+
+Conv1×1: 32 → 10   (1×1)          → [B, 10,  7,  7]
+GAP    : 7×7 → 1×1                → [B, 10,  1,  1]
+Flatten → [B, 10]
+Softmax → class probabilities
 ```
+
+---
+
+### Shape Evolution
+
+- Start: `1×28×28`
+- After Conv/Pool blocks: `32×7×7`
+- 1×1 Conv: `32→10`, output `10×7×7`
+- GAP: average each map → `[10]`
+- Softmax: probabilities over 10 digits
+
+---
+
+### Why 1×1 Conv + GAP?
+
+- Flattening features with a dense layer would require ~15k+ parameters.
+- Instead: **1×1 conv** needs only hundreds of weights.
+- GAP has no parameters, just averages.
+- Result: <20k params total, less overfitting, faster convergence.
+
+---
+
+### Parameter Count
+
+| Layer       | In→Out Channels | Kernel | Params |
+                        |-------------|-----------------|--------|--------|
+                        | Conv1       | 1 → 8           | 3×3    | 80 |
+                        | Conv2       | 8 → 12          | 3×3    | 876 |
+                        | Conv3       | 12 → 16         | 3×3    | 1,744 |
+                        | Conv4       | 16 → 16         | 3×3    | 2,320 |
+                        | Conv5       | 16 → 24         | 3×3    | 3,480 |
+                        | Conv6       | 24 → 32  | 3×3    | 6,944 |
+                        | Conv1×1     | 32 → 10  | 1×1    | 330 |
+                        | **Total**   |                 |        | **15,774** |
+                        
+- **Typical total parameters (most common across runs):** ~15,882
 
 
 ---
@@ -576,6 +615,7 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 - **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.
 - **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.
 - With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.
+- The full model stays within **≈15,882 parameters total**, thanks to the **1×1 Conv + GAP** head that replaces a large fully connected layer.
 
 
 ---

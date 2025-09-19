@@ -231,33 +231,167 @@ python update_readme.py
     # Model section (architecture block + typical params)
     typical_params = typical_param_count(df)
     typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
-    # Architecture block (TinyMNISTNet design)
-    architecture_block = """```text
-Input  : 1×28×28
 
-Conv   : 1 → C1, 3×3, pad=1     (Act)
-Conv   : C1 → C2, 3×3, pad=1    (Act)
-Pool   : 2×2                     (28→14)
+    # Estimate last_channels dynamically
+    # Rough heuristic: from params count, deduce likely last_channels (default 32)
+    # But we can safely assume 32 if CSV doesn’t vary
+    last_ch = 32
+    try:
+        if not df.empty:
+            # read model_variant or last conv channels from params if available
+            if "model_variant" in df.columns:
+                mv = df["model_variant"].dropna().astype(str)
+                if len(mv) > 0 and mv.str.contains("last=").any():
+                    last_ch = int(mv.str.extract(r"last=(\d+)").dropna().iloc[0,0])
+    except Exception:
+        last_ch = 32
 
-Conv   : C2 → C3, 3×3, pad=1    (Act)
-Conv   : C3 → C4, 3×3, pad=1    (Act)
-Pool   : 2×2                     (14→7)
+    # compute param counts dynamically
+    def conv_params(cin, cout, k, use_bias=True):
+        return (cin * cout * (k * k)) + (cout if use_bias else 0)
 
-Conv1×1: C4 → 10
-GAP    : 7×7 → 1×1
-Softmax: 10
-```"""
+    conv1_p = conv_params(1, 8, 3)
+    conv2_p = conv_params(8, 12, 3)
+    conv3_p = conv_params(12, 16, 3)
+    conv4_p = conv_params(16, 16, 3)
+    conv5_p = conv_params(16, 24, 3)
+    conv6_p = conv_params(24, last_ch, 3)
+    conv1x1_p = conv_params(last_ch, 10, 1)
+    total_p = conv1_p + conv2_p + conv3_p + conv4_p + conv5_p + conv6_p + conv1x1_p
+
+    param_table =   f"""| Layer       | In→Out Channels | Kernel | Params |
+                        |-------------|-----------------|--------|--------|
+                        | Conv1       | 1 → 8           | 3×3    | {conv1_p:,} |
+                        | Conv2       | 8 → 12          | 3×3    | {conv2_p:,} |
+                        | Conv3       | 12 → 16         | 3×3    | {conv3_p:,} |
+                        | Conv4       | 16 → 16         | 3×3    | {conv4_p:,} |
+                        | Conv5       | 16 → 24         | 3×3    | {conv5_p:,} |
+                        | Conv6       | 24 → {last_ch}  | 3×3    | {conv6_p:,} |
+                        | Conv1×1     | {last_ch} → 10  | 1×1    | {conv1x1_p:,} |
+                        | **Total**   |                 |        | **{total_p:,}** |
+                        """
 
     model = (
         "## Model: TinyMNISTNet\n\n"
-        "- Compact CNN using only **3×3 convs**, two **MaxPools** (spatial: `28→14→7`).\n"
-        "- A **1×1 conv** + **Global Average Pooling (GAP)** head replaces large fully-connected layers.\n"
-        "- **BatchNorm**/**Dropout** optional; activations tried: **ReLU**, **SiLU**, **GELU**.\n"
-        f"{typical_line}"
-        "- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.\n\n"
+        "TinyMNISTNet is a deliberately compact CNN designed for MNIST digits.  \n"
+        "It enforces three constraints: **<20k parameters**, **≤20 epochs**, and **≥99.4% accuracy**.\n\n"
+        "---\n\n"
         "### Architecture\n\n"
-        f"{architecture_block}\n"
+        "```text\n"
+        "Input  : [B, 1, 28, 28]\n\n"
+        "Conv1  : 1  →  8   (3×3, pad=1)   → [B, 8, 28, 28]\n"
+        "Conv2  : 8  → 12   (3×3, pad=1)   → [B, 12, 28, 28]\n"
+        "Pool   : 2×2                         [B, 12, 14, 14]\n\n"
+        "Conv3  : 12 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
+        "Conv4  : 16 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
+        "Pool   : 2×2                         [B, 16,  7,  7]\n\n"
+        "Conv5  : 16 → 24  (3×3, pad=1)   → [B, 24,  7,  7]\n"
+        f"Conv6  : 24 → {last_ch}  (3×3, pad=1)   → [B, {last_ch},  7,  7]\n\n"
+        f"Conv1×1: {last_ch} → 10   (1×1)          → [B, 10,  7,  7]\n"
+        "GAP    : 7×7 → 1×1                → [B, 10,  1,  1]\n"
+        "Flatten → [B, 10]\n"
+        "Softmax → class probabilities\n"
+        "```\n\n"
+        "---\n\n"
+        "### Shape Evolution\n\n"
+        "- Start: `1×28×28`\n"
+        f"- After Conv/Pool blocks: `{last_ch}×7×7`\n"
+        f"- 1×1 Conv: `{last_ch}→10`, output `10×7×7`\n"
+        "- GAP: average each map → `[10]`\n"
+        "- Softmax: probabilities over 10 digits\n\n"
+        "---\n\n"
+        "### Why 1×1 Conv + GAP?\n\n"
+        "- Flattening features with a dense layer would require ~15k+ parameters.\n"
+        "- Instead: **1×1 conv** needs only hundreds of weights.\n"
+        "- GAP has no parameters, just averages.\n"
+        "- Result: <20k params total, less overfitting, faster convergence.\n\n"
+        "---\n\n"
+        "### Parameter Count\n\n"
+        f"{param_table}\n"
+        f"{typical_line}"
     )
+
+    # typical_params = typical_param_count(df)
+    # typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
+
+    # model = (
+    #     "## Model: TinyMNISTNet\n\n"
+    #     "TinyMNISTNet is a deliberately compact CNN designed for MNIST digits.  \n"
+    #     "It enforces three constraints: **<20k parameters**, **≤20 epochs**, and **≥99.4% accuracy**.\n\n"
+    #     "---\n\n"
+    #     "### Architecture\n\n"
+    #     "```text\n"
+    #     "Input  : [B, 1, 28, 28]\n\n"
+    #     "Conv1  : 1  →  8   (3×3, pad=1)   → [B, 8, 28, 28]\n"
+    #     "Conv2  : 8  → 12   (3×3, pad=1)   → [B, 12, 28, 28]\n"
+    #     "Pool   : 2×2                         [B, 12, 14, 14]\n\n"
+    #     "Conv3  : 12 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
+    #     "Conv4  : 16 → 16  (3×3, pad=1)   → [B, 16, 14, 14]\n"
+    #     "Pool   : 2×2                         [B, 16,  7,  7]\n\n"
+    #     "Conv5  : 16 → 24  (3×3, pad=1)   → [B, 24,  7,  7]\n"
+    #     "Conv6  : 24 → 32  (3×3, pad=1)   → [B, 32,  7,  7]\n\n"
+    #     "Conv1×1: 32 → 10   (1×1)          → [B, 10,  7,  7]\n"
+    #     "GAP    : 7×7 → 1×1                → [B, 10,  1,  1]\n"
+    #     "Flatten → [B, 10]\n"
+    #     "Softmax → class probabilities\n"
+    #     "```\n\n"
+    #     "---\n\n"
+    #     "### Shape Evolution\n\n"
+    #     "- Start: `1×28×28`\n"
+    #     "- After Conv/Pool blocks: `32×7×7`\n"
+    #     "- 1×1 Conv: `32→10`, output `10×7×7`\n"
+    #     "- GAP: average each map → `[10]`\n"
+    #     "- Softmax: probabilities over 10 digits\n\n"
+    #     "---\n\n"
+    #     "### Why 1×1 Conv + GAP?\n\n"
+    #     "- Flattening `32×7×7 = 1568` features with a dense layer → ~15k params.\n"
+    #     "- Instead: **1×1 conv (32→10)** needs only 320 weights + biases.\n"
+    #     "- GAP has no parameters, just averages.\n"
+    #     "- Result: <20k params total, less overfitting, faster convergence.\n\n"
+    #     "---\n\n"
+    #     "### Parameter Count (default last_channels=32)\n\n"
+    #     "| Layer       | In→Out Channels | Kernel | Params |\n"
+    #     "|-------------|-----------------|--------|--------|\n"
+    #     "| Conv1       | 1 → 8           | 3×3    |   80   |\n"
+    #     "| Conv2       | 8 → 12          | 3×3    |  876   |\n"
+    #     "| Conv3       | 12 → 16         | 3×3    | 1,744  |\n"
+    #     "| Conv4       | 16 → 16         | 3×3    | 2,320  |\n"
+    #     "| Conv5       | 16 → 24         | 3×3    | 3,480  |\n"
+    #     "| Conv6       | 24 → 32         | 3×3    | 6,944  |\n"
+    #     "| Conv1×1     | 32 → 10         | 1×1    |   330  |\n"
+    #     "| **Total**   |                 |        | **15,774** |\n\n"
+    #     f"{typical_line}"
+    # )
+
+#     typical_params = typical_param_count(df)
+#     typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
+#     # Architecture block (TinyMNISTNet design)
+#     architecture_block = """```text
+# Input  : 1×28×28
+
+# Conv   : 1 → C1, 3×3, pad=1     (Act)
+# Conv   : C1 → C2, 3×3, pad=1    (Act)
+# Pool   : 2×2                     (28→14)
+
+# Conv   : C2 → C3, 3×3, pad=1    (Act)
+# Conv   : C3 → C4, 3×3, pad=1    (Act)
+# Pool   : 2×2                     (14→7)
+
+# Conv1×1: C4 → 10
+# GAP    : 7×7 → 1×1
+# Softmax: 10
+# ```"""
+
+#     model = (
+#         "## Model: TinyMNISTNet\n\n"
+#         "- Compact CNN using only **3×3 convs**, two **MaxPools** (spatial: `28→14→7`).\n"
+#         "- A **1×1 conv** + **Global Average Pooling (GAP)** head replaces large fully-connected layers.\n"
+#         "- **BatchNorm**/**Dropout** optional; activations tried: **ReLU**, **SiLU**, **GELU**.\n"
+#         f"{typical_line}"
+#         "- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.\n\n"
+#         "### Architecture\n\n"
+#         f"{architecture_block}\n"
+#     )
 
     # Experiment Design (explanations)
     design = (
@@ -348,6 +482,11 @@ Softmax: 10
 
     diagnostics_md = "\n\n".join(diags)
 
+
+    # Use the most common param count for dynamic reporting
+    tp = typical_param_count(df)
+    tp_str = f"**≈{tp:,} parameters total**" if tp else "**<20k parameters total**"
+
     conclusions = (
         "## Conclusions\n\n"
         "- **BN + Dropout** are critical under a tight parameter budget.\n"
@@ -355,7 +494,19 @@ Softmax: 10
         "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
         "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
         "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
+        f"- The full model stays within {tp_str}, thanks to the **1×1 Conv + GAP** head that replaces a large fully connected layer.\n"
     )
+
+
+
+    # conclusions = (
+    #     "## Conclusions\n\n"
+    #     "- **BN + Dropout** are critical under a tight parameter budget.\n"
+    #     "- **AdamW + StepLR** and **SGD + OneCycleLR** typically converge to strong accuracy within few epochs.\n"
+    #     "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
+    #     "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
+    #     "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
+    # )
 
     reproduce = (
         "## Reproduce\n\n"
