@@ -44,8 +44,8 @@ logs/
 Thumbs.db
 
 # --- Project-specific ---
-results/
-results/*.csv
-results/plots/
+# results/
+# results/*.csv
+# results/plots/
 *.pth
 *.pt

@@ -4,33 +4,45 @@
 """
 update_readme.py
 
-Regenerates README.md for the MNIST experiments repo and normalizes results/results.csv
-to the latest schema (21 columns). Handles mixed old/new rows (19 → 21 by padding).
+Regenerates README.md for the MNIST experiments repo.
+
+Assumptions (per user request):
+- results/results.csv already uses the latest 21-column schema (NO mixed/old rows handling).
+
+What this script does:
+- Loads results/results.csv (21 columns in the exact order below).
+- Builds a rich README.md that includes:
+  * Static intro (cleaned sentence + code-fenced folder structure).
+  * Objective.
+  * Model: TinyMNISTNet (architecture block + notes; shows typical total params from CSV).
+  * Experiment Design with explanations (LR, OneCycleLR, StepLR, ReduceLROnPlateau;
+    how optimizers update weights; activation functions overview).
+  * Best Result (So Far).
+  * Full Results table ONLY (sorted by val_acc desc, then fewer params, then lower val_loss, then train_time_sec).
+    The sorting basis is explicitly stated.
+  * Learning Curves & Diagnostics for ALL experiments (not only top runs).
+    For each run, it tries to embed Accuracy/Loss/CM/Misclassified images; otherwise prints a small missing note.
+    Also links per-epoch CSV if present.
 
 Requirements: pandas (and Python stdlib only)
-Platform: Windows-friendly (no GUI ops; file I/O only)
+Windows-friendly: no GUI ops; file I/O only.
 """
 
 from __future__ import annotations
 
 import sys
-import csv
-import shutil
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
+from typing import List, Optional
 
 import pandas as pd
 
-
-# ======== Constants ========
-
+# ---------- Paths & Expected Schema ----------
 REPO_ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = REPO_ROOT / "results"
-PLOTS_DIR = RESULTS_DIR / "plots"
 RESULTS_CSV = RESULTS_DIR / "results.csv"
 README_MD = REPO_ROOT / "README.md"
 
-# Latest schema (21 columns) — exact order required
+# Exact, latest schema (21 columns), left-to-right:
 EXPECTED_COLUMNS: List[str] = [
     "exp_name", "model_variant", "use_bn", "dropout_p", "activation",
     "optimizer", "scheduler", "lr", "weight_decay", "batch_size", "epochs",
@@ -38,152 +50,18 @@ EXPECTED_COLUMNS: List[str] = [
     "epoch_csv", "acc_plot", "loss_plot", "cm_plot", "miscls_plot"
 ]
 
-# Older schema (19 columns) — missing the last two plot fields
-OLD_19_COLUMNS: List[str] = [
-    "exp_name", "model_variant", "use_bn", "dropout_p", "activation",
-    "optimizer", "scheduler", "lr", "weight_decay", "batch_size", "epochs",
-    "params", "train_time_sec", "best_epoch", "val_acc", "val_loss",
-    "epoch_csv", "acc_plot", "loss_plot"
-]
-
 SECTION_DIVIDER = "\n---\n"
 
 
-# ======== Utilities ========
-
-def print_err(msg: str) -> None:
+# ---------- Helpers ----------
+def err(msg: str) -> None:
     print(f"[update_readme] {msg}", file=sys.stderr)
 
 
-def safe_replace(src: Path, dst: Path) -> None:
-    """
-    Replace file atomically-ish: write to temp, then replace destination.
-    """
-    tmp = dst.with_suffix(dst.suffix + ".tmp")
-    shutil.copy2(src, tmp) if src.exists() else None
-    tmp.replace(dst)
-
-
-def write_text_atomic(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8", newline="\n")
-    tmp.replace(path)
-
-
 def file_exists(rel_path: str) -> bool:
-    """
-    Check if a path (likely relative from repo root) exists.
-    """
     if not rel_path:
         return False
-    p = REPO_ROOT / rel_path
-    return p.exists()
-
-
-def load_and_normalize_results(csv_path: Path) -> pd.DataFrame:
-    """
-    Load results.csv and normalize all rows to EXPECTED_COLUMNS (21).
-    Handles:
-      - file missing / empty
-      - mixed schemas (19 & 21)
-      - header/no header scenarios
-    Writes back a normalized CSV safely (temp then replace).
-    Returns a pandas DataFrame with EXPECTED_COLUMNS, dtypes best-effort coerced.
-    """
-    if not csv_path.exists():
-        print_err(f"ERROR: '{csv_path.as_posix()}' is missing. Run training first (e.g., 'python train.py').")
-        sys.exit(1)
-
-    # Read raw file to detect if empty
-    raw = csv_path.read_text(encoding="utf-8", errors="ignore")
-    if not raw.strip():
-        print_err(f"ERROR: '{csv_path.as_posix()}' is empty. Run training first (e.g., 'python train.py').")
-        sys.exit(1)
-
-    # Try to read with header, fall back to no header
-    try:
-        df_try = pd.read_csv(csv_path)
-        cols = list(df_try.columns)
-        has_header = "exp_name" in cols or set(cols) == set(EXPECTED_COLUMNS) or set(cols) == set(OLD_19_COLUMNS)
-    except Exception:
-        has_header = False
-
-    if has_header:
-        df = pd.read_csv(csv_path)
-    else:
-        df = pd.read_csv(csv_path, header=None)
-
-    # Normalize columns
-    if list(df.columns) == EXPECTED_COLUMNS:
-        # Already normalized
-        normalized_df = df.copy()
-    elif list(df.columns) == OLD_19_COLUMNS:
-        # Old header present (19)
-        normalized_df = df.copy()
-        normalized_df["cm_plot"] = ""
-        normalized_df["miscls_plot"] = ""
-        normalized_df = normalized_df[EXPECTED_COLUMNS]
-    elif not has_header:
-        # No header; infer by column count row-wise, then rebuild a normalized DF
-        # We will read as raw rows and map each to 21 columns.
-        rows = []
-        for _, row in df.iterrows():
-            values = list(row.dropna().values)  # drop trailing NaNs that pandas inserted
-            if len(values) == 21:
-                rows.append(values)
-            elif len(values) == 19:
-                rows.append(values + ["", ""])
-            else:
-                # If row length unexpected, try to pad/truncate
-                if len(values) > 21:
-                    rows.append(values[:21])
-                else:
-                    rows.append(values + [""] * (21 - len(values)))
-        normalized_df = pd.DataFrame(rows, columns=EXPECTED_COLUMNS)
-    else:
-        # Header present but unknown/partial: try to align by count
-        current_cols = list(df.columns)
-        if len(current_cols) == 21:
-            # Just rename to expected, assume order is correct
-            df.columns = EXPECTED_COLUMNS
-            normalized_df = df.copy()
-        elif len(current_cols) == 19:
-            df.columns = OLD_19_COLUMNS
-            df["cm_plot"] = ""
-            df["miscls_plot"] = ""
-            normalized_df = df[EXPECTED_COLUMNS].copy()
-        else:
-            # Try to coerce by position
-            values = df.values.tolist()
-            fixed_rows = []
-            for vals in values:
-                vals = [v for v in vals]
-                if len(vals) >= 21:
-                    fixed_rows.append(vals[:21])
-                else:
-                    fixed_rows.append(vals + [""] * (21 - len(vals)))
-            normalized_df = pd.DataFrame(fixed_rows, columns=EXPECTED_COLUMNS)
-
-    # Coerce dtypes where sensible
-    numeric_cols = ["dropout_p", "lr", "weight_decay", "batch_size", "epochs", "params",
-                    "train_time_sec", "best_epoch", "val_acc", "val_loss"]
-    for c in numeric_cols:
-        if c in normalized_df.columns:
-            normalized_df[c] = pd.to_numeric(normalized_df[c], errors="coerce")
-
-    # Convert categorical to str (avoid NaN -> 'nan' later by handling when formatting)
-    str_cols = ["exp_name", "model_variant", "use_bn", "activation",
-                "optimizer", "scheduler", "epoch_csv", "acc_plot", "loss_plot", "cm_plot", "miscls_plot"]
-    for c in str_cols:
-        if c in normalized_df.columns:
-            normalized_df[c] = normalized_df[c].astype(str).fillna("")
-
-    # Write back normalized CSV safely
-    normalized_path_tmp = csv_path.with_suffix(".csv.normalized.tmp")
-    normalized_df.to_csv(normalized_path_tmp, index=False, quoting=csv.QUOTE_MINIMAL)
-    normalized_path_tmp.replace(csv_path)
-
-    return normalized_df
+    return (REPO_ROOT / rel_path).exists()
 
 
 def format_float(val: Optional[float], ndigits: int) -> str:
@@ -195,7 +73,7 @@ def format_float(val: Optional[float], ndigits: int) -> str:
         return ""
 
 
-def format_time_seconds(val: Optional[float]) -> str:
+def format_time(val: Optional[float]) -> str:
     if pd.isna(val):
         return ""
     try:
@@ -205,141 +83,93 @@ def format_time_seconds(val: Optional[float]) -> str:
 
 
 def best_overall(df: pd.DataFrame) -> pd.Series:
-    """
-    Best overall by highest val_acc; tiebreaker: fewer params, then lower val_loss, then shorter train_time_sec.
-    """
     d = df.copy()
     d["val_acc"] = pd.to_numeric(d["val_acc"], errors="coerce")
     d["params"] = pd.to_numeric(d["params"], errors="coerce")
     d["val_loss"] = pd.to_numeric(d["val_loss"], errors="coerce")
     d["train_time_sec"] = pd.to_numeric(d["train_time_sec"], errors="coerce")
-
-    # Sort with desired priority
     d = d.sort_values(
         by=["val_acc", "params", "val_loss", "train_time_sec"],
         ascending=[False, True, True, True],
-        kind="mergesort"  # stable
+        kind="mergesort"
     )
     return d.iloc[0]
 
 
-def best_by_prefix(df: pd.DataFrame, prefix: str) -> Tuple[int, Optional[pd.Series]]:
-    sub = df[df["exp_name"].astype(str).str.startswith(prefix)]
-    if sub.empty:
-        return 0, None
-    row = best_overall(sub)
-    return len(sub), row
-
-
 def typical_param_count(df: pd.DataFrame) -> Optional[int]:
-    if "params" not in df.columns:
-        return None
     vc = df["params"].dropna().astype(int).value_counts()
     if vc.empty:
         return None
     return int(vc.idxmax())
 
 
-def row_to_config_summary(r: pd.Series) -> str:
-    use_bn = str(r.get("use_bn", "")).strip()
-    dropout_p = r.get("dropout_p", None)
-    activation = str(r.get("activation", "")).strip()
-    optimizer = str(r.get("optimizer", "")).strip()
-    scheduler = str(r.get("scheduler", "")).strip()
-    lr = r.get("lr", None)
-    batch_size = r.get("batch_size", None)
-    epochs = r.get("epochs", None)
-
-    # Compose "Optimizer+Scheduler"
-    opt_sched = optimizer
-    if scheduler:
-        opt_sched = f"{optimizer} + {scheduler}"
-
+def config_summary(r: pd.Series) -> str:
     parts = []
-    if use_bn != "":
-        parts.append(f"BN: {use_bn}")
-    if not pd.isna(dropout_p):
-        parts.append(f"Dropout: {format_float(dropout_p, 3)}")
-    if activation:
-        parts.append(f"Activation: {activation}")
-    if opt_sched:
-        parts.append(f"Optimizer+Scheduler: {opt_sched}")
-    if not pd.isna(lr):
-        parts.append(f"LR: {format_float(lr, 5)}")
-    if not pd.isna(batch_size):
-        parts.append(f"BatchSize: {int(batch_size)}")
-    if not pd.isna(epochs):
-        parts.append(f"Epochs: {int(epochs)}")
+    if "use_bn" in r:
+        parts.append(f"BN: {str(r['use_bn']).strip()}")
+    if "dropout_p" in r and not pd.isna(r["dropout_p"]):
+        parts.append(f"Dropout: {format_float(r['dropout_p'], 3)}")
+    if "activation" in r and str(r["activation"]).strip():
+        parts.append(f"Activation: {str(r['activation']).strip()}")
+    # Optimizer + Scheduler
+    opt = str(r.get("optimizer", "")).strip()
+    sch = str(r.get("scheduler", "")).strip()
+    if opt and sch:
+        parts.append(f"Optimizer+Scheduler: {opt} + {sch}")
+    elif opt:
+        parts.append(f"Optimizer: {opt}")
+    if "lr" in r and not pd.isna(r["lr"]):
+        parts.append(f"LR: {format_float(r['lr'], 5)}")
+    if "batch_size" in r and not pd.isna(r["batch_size"]):
+        parts.append(f"BatchSize: {int(r['batch_size'])}")
+    if "epochs" in r and not pd.isna(r["epochs"]):
+        parts.append(f"Epochs: {int(r['epochs'])}")
     return " | ".join(parts)
 
 
-def markdown_image_or_note(title: str, rel_path: str) -> str:
-    """
-    Return a Markdown image embed if the file exists, otherwise a small italicized note.
-    """
+def md_image_or_note(title: str, rel_path: str) -> str:
     if rel_path and file_exists(rel_path):
-        # Use relative path as-is in README
         return f"**{title}:**\n\n![]({rel_path})\n"
-    else:
-        missing_path = rel_path if rel_path else "(not provided)"
-        return f"**{title}:** _Missing at '{missing_path}'_\n"
+    missing_path = rel_path if rel_path else "(not provided)"
+    return f"**{title}:** _Missing at '{missing_path}'_\n"
 
 
 def make_table(df: pd.DataFrame, columns: List[str]) -> str:
-    """
-    Build a GitHub-flavored Markdown table from the dataframe subset.
-    """
-    # Header
     header = "| " + " | ".join(columns) + " |"
     sep = "| " + " | ".join(["---"] * len(columns)) + " |"
     lines = [header, sep]
-
     for _, row in df.iterrows():
-        cells = []
-        for col in columns:
-            val = row.get(col, "")
-            if pd.isna(val):
-                val = ""
-            # Ensure strings for markdown
-            cells.append(str(val))
-        lines.append("| " + " | ".join(cells) + " |")
+        vals = []
+        for c in columns:
+            v = row.get(c, "")
+            if pd.isna(v):
+                v = ""
+            vals.append(str(v))
+        lines.append("| " + " | ".join(vals) + " |")
     return "\n".join(lines)
 
 
-def format_results_for_tables(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Returns a copy of df with human-formatted numeric columns for printing tables.
-    """
-    d = df.copy()
-
-    # Formatting columns as specified
-    if "val_acc" in d.columns:
-        d["val_acc"] = d["val_acc"].apply(lambda x: format_float(x, 2))
-    if "val_loss" in d.columns:
-        d["val_loss"] = d["val_loss"].apply(lambda x: format_float(x, 4))
-    if "train_time_sec" in d.columns:
-        d["train_time_sec"] = d["train_time_sec"].apply(format_time_seconds)
-
-    # Ensure integers display cleanly
+def format_for_display(d: pd.DataFrame) -> pd.DataFrame:
+    out = d.copy()
+    if "val_acc" in out:
+        out["val_acc"] = out["val_acc"].apply(lambda x: format_float(x, 2))
+    if "val_loss" in out:
+        out["val_loss"] = out["val_loss"].apply(lambda x: format_float(x, 4))
+    if "train_time_sec" in out:
+        out["train_time_sec"] = out["train_time_sec"].apply(format_time)
     for c in ["batch_size", "epochs", "params", "best_epoch"]:
-        if c in d.columns:
-            d[c] = d[c].apply(lambda x: "" if pd.isna(x) else str(int(x)))
-
-    # Drop excessive precision in dropout and lr for display (keep raw in CSV)
-    if "dropout_p" in d.columns:
-        d["dropout_p"] = d["dropout_p"].apply(lambda x: "" if pd.isna(x) else format_float(x, 3))
-    if "lr" in d.columns:
-        d["lr"] = d["lr"].apply(lambda x: "" if pd.isna(x) else format_float(x, 5))
-
-    return d
+        if c in out:
+            out[c] = out[c].apply(lambda x: "" if pd.isna(x) else str(int(x)))
+    if "dropout_p" in out:
+        out["dropout_p"] = out["dropout_p"].apply(lambda x: "" if pd.isna(x) else format_float(x, 3))
+    if "lr" in out:
+        out["lr"] = out["lr"].apply(lambda x: "" if pd.isna(x) else format_float(x, 5))
+    return out
 
 
+# ---------- README Builder ----------
 def build_readme(df: pd.DataFrame) -> str:
-    """
-    Construct the final README.md content based on the provided DataFrame.
-    """
-
-    # ---------- Static Intro (KEEP VERBATIM) ----------
+    # Intro (clean sentence) + fenced folder structure (renders reliably)
     intro = """# MNIST Experiments (TinyMNISTNet)
 
 This repo runs a compact set of **reproducible MNIST experiments** with a parameter-budget model.
@@ -349,80 +179,101 @@ It compares:
 3. **With BN/Dropout** + batch-size sweep using the optimizers from (2)
 4. **Activation variants** (ReLU, SiLU, GELU) with BN/Dropout
 
-Results are logged to `results/results.csv`. Generate the README with tables **and curves** using `update_readme.py`.
+Results are logged to `results/results.csv`. Use `update_readme.py` to generate the README with tables and plots.
 Per-experiment epoch CSVs and plots are saved in `results/` and `results/plots/`.
 
 ## Folder structure
-
-
+```text
 mnist_experiments/
 ├─ models/
-│ └─ model.py
+│  └─ model.py
 ├─ results/
-│ ├─ results.csv
-│ └─ plots/
+│  ├─ results.csv
+│  └─ plots/
 ├─ train.py
 ├─ update_readme.py
 ├─ requirements.txt
 └─ README.md
 
-
-## Quickstart
-```bash
+Quickstart
 pip install -r requirements.txt
 python train.py --mode grid          # run all experiments
 python update_readme.py              # generate README.md with tables + plots
 
-Single run examples
+# Single run example
 python train.py --mode single --use_bn 1 --dropout_p 0.05 --activation relu \
   --optimizer adamw --scheduler step --lr 0.0025 --weight_decay 1e-4 \
   --batch_size 128 --epochs 15 --augment 1
 python update_readme.py
 ```"""
 
-    # ---------- Objective ----------
+    # Objective
     objective = (
         "## Objective\n\n"
         "- **Constraints:** `< 20,000` parameters, `≤ 20` epochs, target `≥ 99.4%` validation accuracy "
         "(MNIST 10k test set used as validation; training split is 50k).\n"
     )
 
-    # ---------- Model: TinyMNISTNet ----------
+    # Model section (architecture block + typical params)
     typical_params = typical_param_count(df)
-    typical_params_line = f"- **Typical parameter count (most common across runs):** ~{typical_params:,} params\n" if typical_params else ""
+    typical_line = f"- **Typical total parameters (most common across runs):** ~{typical_params:,}\n" if typical_params else ""
+    # Architecture block (TinyMNISTNet design)
+    architecture_block = """```text
+Input  : 1×28×28
+
+Conv   : 1 → C1, 3×3, pad=1     (Act)
+Conv   : C1 → C2, 3×3, pad=1    (Act)
+Pool   : 2×2                     (28→14)
+
+Conv   : C2 → C3, 3×3, pad=1    (Act)
+Conv   : C3 → C4, 3×3, pad=1    (Act)
+Pool   : 2×2                     (14→7)
+
+Conv1×1: C4 → 10
+GAP    : 7×7 → 1×1
+Softmax: 10
+```"""
 
     model = (
         "## Model: TinyMNISTNet\n\n"
         "- Compact CNN using only **3×3 convs**, two **MaxPools** (spatial: `28→14→7`).\n"
         "- A **1×1 conv** + **Global Average Pooling (GAP)** head replaces large fully-connected layers.\n"
         "- **BatchNorm**/**Dropout** optional; activations tried: **ReLU**, **SiLU**, **GELU**.\n"
-        f"{typical_params_line}"
-        "- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.\n"
+        f"{typical_line}"
+        "- **Why GAP?** It eliminates big FC layers, reduces parameters, and improves generalization under tight budgets.\n\n"
+        "### Architecture\n\n"
+        f"{architecture_block}\n"
     )
 
-    # ---------- Experiment Design (A/B/C/D) ----------
-    # Compute summaries by prefix
-    blocks = []
-    for prefix, title, desc in [
-        ("A_", "A. Baseline", "No BN/Dropout, vanilla SGD (no momentum)"),
-        ("B_", "B. BN+Dropout + Optimizers", "SGD+OneCycleLR, AdamW+StepLR, RMSprop+ReduceLROnPlateau, Adam+OneCycleLR"),
-        ("C_", "C. BN+Dropout + Batch-size sweep", "Batch sizes: 32, 64, 128 across the optimizers from (B)"),
-        ("D_", "D. BN+Dropout + Activation variants", "Activations: ReLU, SiLU, GELU using AdamW + StepLR"),
-    ]:
-        n, best = best_by_prefix(df, prefix)
-        if best is None:
-            line = f"**{title}** — {desc}\n\n- Runs: 0 | Best acc: N/A | Best exp: N/A\n"
-        else:
-            line = (
-                f"**{title}** — {desc}\n\n"
-                f"- Runs: {n} | Best acc: {format_float(best.get('val_acc'), 2)}% | Best exp: `{best.get('exp_name', '')}`\n"
-            )
-        blocks.append(line)
-    design = "## Experiment Design\n\n" + "\n".join(blocks)
+    # Experiment Design (explanations)
+    design = (
+        "## Experiment Design\n\n"
+        "**What’s varied and why**\n\n"
+        "- **Learning Rate (LR):** step size for weight updates each iteration.\n"
+        "- **Schedulers:**\n"
+        "  - **OneCycleLR:** Increases LR up to a peak then decreases it within a single run; encourages fast convergence and regularization.\n"
+        "  - **StepLR:** Multiplies LR by a factor (e.g., 0.1) every fixed number of epochs; a simple decay schedule.\n"
+        "  - **ReduceLROnPlateau:** Lowers LR when a monitored metric (e.g., val loss) stops improving; adapts LR to training plateaus.\n"
+        "- **Optimizers (how they update weights):**\n"
+        "  - **SGD (vanilla):** `w ← w − lr * grad` (no momentum here in baseline A). Simple, stable with proper schedules.\n"
+        "  - **SGD + OneCycleLR (B/C):** Same rule but LR follows OneCycle; typically reaches good accuracy quickly.\n"
+        "  - **AdamW + StepLR (B/D):** Adam-style adaptive moments with **decoupled weight decay** (better regularization) + StepLR decay.\n"
+        "  - **RMSprop + ReduceLROnPlateau (B):** Scales updates by running average of squared gradients; LR reduced when progress stalls.\n"
+        "  - **Adam + OneCycleLR (B/C):** Adam’s adaptive moments combined with OneCycle schedule.\n"
+        "- **Activations:**\n"
+        "  - **ReLU:** max(0, x); cheap, strong baseline.\n"
+        "  - **SiLU (Swish):** x * sigmoid(x); smooth, can improve convergence.\n"
+        "  - **GELU:** Gaussian-error linear unit; smooth, often strong in transformers/CNNs.\n\n"
+        "**Blocks we run**\n\n"
+        "- **A. Baseline:** no BN/Dropout, **SGD (no momentum)**.\n"
+        "- **B. BN + Dropout + Optimizers:** SGD+OneCycleLR, AdamW+StepLR, RMSprop+ReduceLROnPlateau, Adam+OneCycleLR.\n"
+        "- **C. BN + Dropout + Batch sizes:** {32, 64, 128} across optimizers from (B).\n"
+        "- **D. BN + Dropout + Activations:** {ReLU, SiLU, GELU} using **AdamW + StepLR**.\n"
+    )
 
-    # ---------- Best Result (So Far) ----------
+    # Best Result
     best = best_overall(df)
-    best_line = (
+    best_md = (
         "## Best Result (So Far)\n\n"
         f"- **Experiment:** `{best.get('exp_name', '')}`\n"
         f"- **Val Acc:** {format_float(best.get('val_acc'), 2)}%\n"
@@ -430,42 +281,36 @@ python update_readme.py
         f"- **Params:** {'' if pd.isna(best.get('params')) else f'{int(best.get('params')):,}'}\n"
         f"- **Epochs:** {'' if pd.isna(best.get('epochs')) else int(best.get('epochs'))}\n"
         f"- **Best Epoch:** {'' if pd.isna(best.get('best_epoch')) else int(best.get('best_epoch'))}\n"
-        f"- **Config:** {row_to_config_summary(best)}\n"
+        f"- **Config:** {config_summary(best)}\n"
     )
 
-    # ---------- Top Results (Top 10) & Full Results ----------
-    # Sort master DF for ranking
-    df_sorted = df.sort_values(
+    # Full Results only (sorted with explicit rules)
+    df_sorted = df.copy()
+    df_sorted["val_acc"] = pd.to_numeric(df_sorted["val_acc"], errors="coerce")
+    df_sorted["params"] = pd.to_numeric(df_sorted["params"], errors="coerce")
+    df_sorted["val_loss"] = pd.to_numeric(df_sorted["val_loss"], errors="coerce")
+    df_sorted["train_time_sec"] = pd.to_numeric(df_sorted["train_time_sec"], errors="coerce")
+    df_sorted = df_sorted.sort_values(
         by=["val_acc", "params", "val_loss", "train_time_sec"],
         ascending=[False, True, True, True],
         kind="mergesort"
     ).reset_index(drop=True)
 
-    top_k = 10
-    df_top = df_sorted.head(top_k).copy()
-
-    # Build display tables
     display_cols = [
         "exp_name", "use_bn", "dropout_p", "activation", "optimizer", "scheduler",
         "lr", "batch_size", "epochs", "params", "val_acc", "val_loss", "best_epoch", "train_time_sec"
     ]
-    # Prepare formatted copies
-    top_for_table = format_results_for_tables(df_top)[display_cols]
-    full_for_table = format_results_for_tables(df_sorted)[display_cols]
+    full_table = make_table(format_for_display(df_sorted)[display_cols], display_cols)
 
-    top_table_md = make_table(top_for_table, display_cols)
-    full_table_md = make_table(full_for_table, display_cols)
-
-    tables = (
-        "## Top Results (Top 10)\n\n"
-        f"{top_table_md}\n\n"
+    results_md = (
         "## Full Results\n\n"
-        f"{full_table_md}\n"
+        "_Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Train Time (asc)**._\n\n"
+        f"{full_table}\n"
     )
 
-    # ---------- Learning Curves & Diagnostics (Top Results) ----------
-    diag_blocks = ["## Learning Curves & Diagnostics (Top Results)\n"]
-    for _, r in df_top.iterrows():
+    # Learning Curves & Diagnostics for ALL experiments
+    diags = ["## Learning Curves & Diagnostics (All Experiments)\n"]
+    for _, r in df_sorted.iterrows():
         exp = str(r.get("exp_name", ""))
         acc_plot = str(r.get("acc_plot", ""))
         loss_plot = str(r.get("loss_plot", ""))
@@ -473,33 +318,31 @@ python update_readme.py
         mis_plot = str(r.get("miscls_plot", ""))
         epoch_csv = str(r.get("epoch_csv", ""))
 
-        section = [f"### `{exp}`\n"]
-        section.append(markdown_image_or_note("Accuracy", acc_plot))
-        section.append(markdown_image_or_note("Loss", loss_plot))
-        section.append(markdown_image_or_note("Confusion Matrix", cm_plot))
-        section.append(markdown_image_or_note("Misclassified Samples", mis_plot))
+        block = [f"### `{exp}`\n"]
+        block.append(md_image_or_note("Accuracy", acc_plot))
+        block.append(md_image_or_note("Loss", loss_plot))
+        block.append(md_image_or_note("Confusion Matrix", cm_plot))
+        block.append(md_image_or_note("Misclassified Samples", mis_plot))
 
         if epoch_csv and file_exists(epoch_csv):
-            section.append(f"- Per-epoch CSV: `{epoch_csv}`\n")
+            block.append(f"- Per-epoch CSV: `{epoch_csv}`\n")
         else:
-            missing_path = epoch_csv if epoch_csv else "(not provided)"
-            section.append(f"- Per-epoch CSV: _Missing at '{missing_path}'_\n")
+            missing = epoch_csv if epoch_csv else "(not provided)"
+            block.append(f"- Per-epoch CSV: _Missing at '{missing}'_\n")
 
-        diag_blocks.append("\n".join(section))
+        diags.append("\n".join(block))
 
-    diagnostics = "\n\n".join(diag_blocks)
+    diagnostics_md = "\n\n".join(diags)
 
-    # ---------- Conclusions ----------
     conclusions = (
         "## Conclusions\n\n"
-        "- **BN + Dropout** are critical under a strict parameter budget.\n"
-        "- **AdamW + StepLR** and **SGD + OneCycleLR** converge strongly within few epochs.\n"
-        "- **Batch size trade-offs:** 32/64 can edge out 128 on accuracy for MNIST in this budget.\n"
-        "- **SiLU/GELU vs ReLU:** Differences are small on MNIST; minor gains are possible.\n"
-        "- With proper scheduling + light augmentation, **≥ 99.4%** within **≤ 20 epochs** is reliable.\n"
+        "- **BN + Dropout** are critical under a tight parameter budget.\n"
+        "- **AdamW + StepLR** and **SGD + OneCycleLR** typically converge to strong accuracy within few epochs.\n"
+        "- **Batch size trade-offs:** 32/64 often edge out 128 in this budget on MNIST.\n"
+        "- **SiLU/GELU vs ReLU:** Differences are modest on MNIST; small gains are possible.\n"
+        "- With proper scheduling + light augmentation, **≥ 99.4% within ≤ 20 epochs** is consistently achievable.\n"
     )
 
-    # ---------- Reproduce ----------
     reproduce = (
         "## Reproduce\n\n"
         "Use the same commands as in **Quickstart**.\n\n"
@@ -510,7 +353,6 @@ python update_readme.py
         "```\n"
     )
 
-    # Assemble full README
     parts = [
         intro,
         SECTION_DIVIDER,
@@ -520,36 +362,51 @@ python update_readme.py
         SECTION_DIVIDER,
         design,
         SECTION_DIVIDER,
-        best_line,
+        best_md,
         SECTION_DIVIDER,
-        tables,
+        results_md,
         SECTION_DIVIDER,
-        diagnostics,
+        diagnostics_md,
         SECTION_DIVIDER,
         conclusions,
         SECTION_DIVIDER,
-        reproduce
+        reproduce,
     ]
     return "\n".join(parts).rstrip() + "\n"
 
 
+# ---------- Main ----------
 def main() -> None:
-    # 1) Normalize CSV to latest schema
-    df = load_and_normalize_results(RESULTS_CSV)
-
-    # Guard against empty DF after normalization (e.g., CSV had headers only)
-    if df is None or df.empty:
-        print_err(f"ERROR: '{RESULTS_CSV.as_posix()}' has no data rows. Run training first (e.g., 'python train.py').")
+    if not RESULTS_CSV.exists():
+        err(f"ERROR: '{RESULTS_CSV.as_posix()}' not found. Run training first (e.g., 'python train.py').")
         sys.exit(1)
 
-    # 2) Build README content
+    # Read CSV with the expected header (21 columns)
+    try:
+        df = pd.read_csv(RESULTS_CSV)
+    except Exception as e:
+        err(f"ERROR: Failed to read '{RESULTS_CSV.as_posix()}': {e}")
+        sys.exit(1)
+
+    # Validate schema length (strict)
+    if list(df.columns) != EXPECTED_COLUMNS:
+        err("ERROR: results.csv does not match the expected 21-column schema.\n"
+            f"Expected columns:\n{EXPECTED_COLUMNS}\n"
+            f"Found:\n{list(df.columns)}")
+        sys.exit(1)
+
+    if df.empty:
+        err(f"ERROR: '{RESULTS_CSV.as_posix()}' has no data rows. Run training first.")
+        sys.exit(1)
+
     readme_text = build_readme(df)
 
-    # 3) Write README.md safely
-    write_text_atomic(README_MD, readme_text)
+    # Write README (atomic-ish)
+    tmp = README_MD.with_suffix(".md.tmp")
+    tmp.write_text(readme_text, encoding="utf-8", newline="\n")
+    tmp.replace(README_MD)
 
     print("[update_readme] README.md generated successfully.")
-    print(f"[update_readme] Normalized CSV saved at: {RESULTS_CSV.as_posix()}")
 
 
 if __name__ == "__main__":
