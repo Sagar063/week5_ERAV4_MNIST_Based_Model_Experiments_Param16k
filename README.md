@@ -216,6 +216,35 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 
 ---
 
+## Conclusions
+### A. Baseline (no BN/Dropout, vanilla SGD)
+- `A_noBN_noDO_vanillaGD` peaked at **98.81%** with 15774 params.
+  → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.
+
+### B. BN + Dropout + Optimizers
+- Adam OneCycle best: `B_bn_do_adam_onecycle` → **99.49%** (val loss 0.0157).
+- AdamW StepLR strong: `B_bn_do_adamw_step` → **99.47%**, faster convergence (best epoch 11).
+- SGD OneCycle: `B_bn_do_sgd_onecycle` → **99.44%**.
+- RMSprop Plateau weaker, around 99.32%.
+
+### C. BN + Dropout + Batch-Size Sweep
+- Best overall run: `C_bs_sweep_sgd_onecycle_bs64` → **99.52%** (val loss 0.0151) at epoch 18/20, 15,882 params.
+- Batch size sweet spot at **64**: stable convergence and top accuracy.
+
+### D. BN + Dropout + Activations
+- Best activation: silu → **99.36%** (under AdamW+StepLR).
+- Differences modest on MNIST (<0.1%).
+
+### 🏆 Collective Insights
+- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy.
+- Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.
+- Batch size: sweet spot at 64. Too small/large showed minor trade-offs.
+- Activations: SiLU/GELU did not significantly outperform ReLU.
+- **Best overall:** `C_bs_sweep_sgd_onecycle_bs64` → 99.52% @ epoch 18, 15,882 params.
+
+
+---
+
 ## Learning Curves & Diagnostics (Per Experiment)
 
 
@@ -477,18 +506,6 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 ![](results/plots/A_noBN_noDO_vanillaGD_miscls.png)
 
 - Per-epoch CSV: `results/A_noBN_noDO_vanillaGD_metrics.csv`
-
-
----
-
-## Conclusions
-
-- **BN + Dropout are critical:** the baseline (A) peaked at **98.81%**, while BN/Dropout runs exceeded **99.4%** (12 runs).
-- **Optimizers:** **Adam + OneCycleLR** up to **99.49%**; **AdamW + StepLR** up to **99.47%**; **SGD + OneCycleLR** up to **99.44%**; **RMSprop + ReduceLROnPlateau** around **99.32%**.
-- **Batch-size sweep (C):** best results clustered at **bs=64**, with the top C-run reaching **99.52%**.
-- **Activations (D):** differences were modest on MNIST; best was **silu** at **99.36%** (under AdamW+StepLR).
-- **Best overall:** `C_bs_sweep_sgd_onecycle_bs64` → **99.52%** (val loss **0.0151**) by epoch **18** / 20, **15,882** params.
-- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, TinyMNISTNet (≈15,882 parameters) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **99.52%**.
 
 
 ---

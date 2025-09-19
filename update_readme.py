@@ -437,8 +437,32 @@ def build_dynamic_conclusions(df: pd.DataFrame) -> str:
             f"- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, "
             f"TinyMNISTNet ({tp_str}) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **{best_acc}%**."
         )
+    conclusion_md = [
+    "## Conclusions\n",
+    "### A. Baseline (no BN/Dropout, vanilla SGD)\n",
+    f"- `{a_best['exp_name']}` peaked at **{a_acc}%** with {int(a_best['params'])} params.\n"
+    "  → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.\n\n",
+    "### B. BN + Dropout + Optimizers\n",
+    f"- Adam OneCycle best: `{b_adam_1cyc['exp_name']}` → **{format_float(b_adam_1cyc['val_acc'], 2)}%** (val loss {format_float(b_adam_1cyc['val_loss'], 4)}).\n"
+    f"- AdamW StepLR strong: `{b_adamw_step['exp_name']}` → **{format_float(b_adamw_step['val_acc'], 2)}%**, faster convergence (best epoch {int(b_adamw_step['best_epoch'])}).\n"
+    f"- SGD OneCycle: `{b_sgd_1cyc['exp_name']}` → **{format_float(b_sgd_1cyc['val_acc'], 2)}%**.\n"
+    f"- RMSprop Plateau weaker, around {format_float(b_rms_plateau['val_acc'], 2)}%.\n\n",
+    "### C. BN + Dropout + Batch-Size Sweep\n",
+    f"- Best overall run: `{best_name}` → **{best_acc}%** (val loss {best_loss}) at epoch {best_ep}/{best_epochs}, {best_params} params.\n"
+    f"- Batch size sweet spot at **{best_bs}**: stable convergence and top accuracy.\n\n",
+    "### D. BN + Dropout + Activations\n",
+    f"- Best activation: {d_act} → **{d_acc}%** (under AdamW+StepLR).\n"
+    "- Differences modest on MNIST (<0.1%).\n\n",
+    "### 🏆 Collective Insights\n",
+    "- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy.\n"
+    "- Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.\n"
+    "- Batch size: sweet spot at 64. Too small/large showed minor trade-offs.\n"
+    "- Activations: SiLU/GELU did not significantly outperform ReLU.\n"
+    f"- **Best overall:** `{best_name}` → {best_acc}% @ epoch {best_ep}, {best_params} params.\n"
+]
+    return "".join(conclusion_md)
 
-    return "## Conclusions\n\n" + "\n".join(bullets) + "\n"
+    #return "## Conclusions\n\n" + "\n".join(bullets) + "\n"
 
 
 def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
@@ -1003,27 +1027,48 @@ python update_readme.py
         "```\n"
     )
 
+    # parts = [
+    #     intro,
+    #     SECTION_DIVIDER,
+    #     objective,
+    #     SECTION_DIVIDER,
+    #     model,
+    #     SECTION_DIVIDER,
+    #     design,
+    #     SECTION_DIVIDER,
+    #     best_md,
+    #     SECTION_DIVIDER,
+    #     results_md,
+    #     SECTION_DIVIDER,
+    #     combined_md,
+    #     SECTION_DIVIDER,
+    #     diagnostics_md,
+    #     SECTION_DIVIDER,
+    #     conclusions,
+    #     SECTION_DIVIDER,
+    #     reproduce,
+    # ]
     parts = [
-        intro,
-        SECTION_DIVIDER,
-        objective,
-        SECTION_DIVIDER,
-        model,
-        SECTION_DIVIDER,
-        design,
-        SECTION_DIVIDER,
-        best_md,
-        SECTION_DIVIDER,
-        results_md,
-        SECTION_DIVIDER,
-        combined_md,
-        SECTION_DIVIDER,
-        diagnostics_md,
-        SECTION_DIVIDER,
-        conclusions,
-        SECTION_DIVIDER,
-        reproduce,
-    ]
+    intro,
+    SECTION_DIVIDER,
+    objective,
+    SECTION_DIVIDER,
+    model,
+    SECTION_DIVIDER,
+    design,
+    SECTION_DIVIDER,
+    best_md,
+    SECTION_DIVIDER,
+    results_md,
+    SECTION_DIVIDER,
+    combined_md,
+    SECTION_DIVIDER,
+    conclusions,        # <--- move conclusions up
+    SECTION_DIVIDER,
+    diagnostics_md,     # diagnostics after conclusions
+    SECTION_DIVIDER,
+    reproduce,]
+
     return "\n".join(parts).rstrip() + "\n"
 
 
