@@ -173,7 +173,7 @@ def make_table(df: pd.DataFrame, columns: List[str]) -> str:
             if pd.isna(v):
                 v = ""
             vals.append(str(v))
-        lines.append("| " + " " .join(vals).replace(" ", " | ") + " |")  # keep alignment
+        lines.append("| " + " | ".join(vals) + " |")     # keep alignment
     return "\n".join(lines)
 
 
@@ -196,29 +196,59 @@ def format_for_display(d: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------- Combined Plotting ----------
-def _read_epoch_csv(path_str: str) -> Optional[pd.DataFrame]:
+# def _read_epoch_csv(path_str: str) -> Optional[pd.DataFrame]:
+#     """
+#     Read a per-epoch CSV robustly. Returns a DataFrame or None.
+#     Tries to coerce common column names for epochs, accuracy, loss (train/val).
+#     """
+#     if not path_str:
+#         return None
+#     p = REPO_ROOT / path_str
+#     if not p.exists():
+#         return None
+#     try:
+#         df_ep = pd.read_csv(p)
+#     except Exception:
+#         return None
+
+#     # Standardize column names (lowercase, strip)
+#     df_ep.columns = [c.strip().lower() for c in df_ep.columns]
+
+#     # Ensure an epoch column exists; if not, create a 1..N index
+#     if "epoch" not in df_ep.columns:
+#         df_ep["epoch"] = range(1, len(df_ep) + 1)
+
+#     return df_ep
+
+def _read_epoch_csv(path_str: str, exp_name: str) -> Optional[pd.DataFrame]:
     """
     Read a per-epoch CSV robustly. Returns a DataFrame or None.
-    Tries to coerce common column names for epochs, accuracy, loss (train/val).
+    Tries multiple candidate paths:
+      1) epoch_csv as given
+      2) epoch_csv with backslashes -> slashes
+      3) results/plots/<exp_name>_metrics.csv
+    Standardizes column names and ensures an 'epoch' column exists.
     """
-    if not path_str:
-        return None
-    p = REPO_ROOT / path_str
-    if not p.exists():
-        return None
-    try:
-        df_ep = pd.read_csv(p)
-    except Exception:
-        return None
+    candidates = []
+    if path_str:
+        candidates.append(path_str)
+        candidates.append(Path(path_str).as_posix())
 
-    # Standardize column names (lowercase, strip)
-    df_ep.columns = [c.strip().lower() for c in df_ep.columns]
+    # common fallback from your repo layout
+    candidates.append((PLOTS_DIR / f"{exp_name}_metrics.csv").relative_to(REPO_ROOT).as_posix())
 
-    # Ensure an epoch column exists; if not, create a 1..N index
-    if "epoch" not in df_ep.columns:
-        df_ep["epoch"] = range(1, len(df_ep) + 1)
-
-    return df_ep
+    for cand in candidates:
+        p = REPO_ROOT / cand
+        if p.exists():
+            try:
+                df_ep = pd.read_csv(p)
+                df_ep.columns = [c.strip().lower() for c in df_ep.columns]
+                if "epoch" not in df_ep.columns:
+                    df_ep["epoch"] = range(1, len(df_ep) + 1)
+                return df_ep
+            except Exception:
+                continue
+    return None
 
 
 def _pick_col(df_ep: pd.DataFrame, candidates: List[str]) -> Optional[str]:
@@ -226,6 +256,40 @@ def _pick_col(df_ep: pd.DataFrame, candidates: List[str]) -> Optional[str]:
         if c in df_ep.columns:
             return c
     return None
+
+def prettify_label(exp: str) -> str:
+    """
+    Shorten long experiment names for cleaner legends in combined plots.
+    Adjust the replacements as needed for your naming conventions.
+    """
+    s = exp
+
+    # Collapse block prefixes
+    s = s.replace("A_noBN_noDO_", "A/")
+    s = s.replace("B_bn_do_", "B/")
+    s = s.replace("C_bs_sweep_", "C/")
+    s = s.replace("D_activation_", "D/")
+
+    # Optimizers + schedulers
+    s = s.replace("_onecycle", "+1cyc")
+    s = s.replace("_step", "+step")
+    s = s.replace("_plateau", "+plat")
+
+    # Common optimizers
+    s = s.replace("adamw", "AdamW")
+    s = s.replace("adam", "Adam")
+    s = s.replace("rmsprop", "RMSprop")
+    s = s.replace("sgd", "SGD")
+
+    # Batch sizes
+    s = s.replace("_bs32", "/32")
+    s = s.replace("_bs64", "/64")
+    s = s.replace("_bs128", "/128")
+
+    # Dropout shorthand
+    s = s.replace("_drop", " d")
+
+    return s
 
 
 def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
@@ -242,23 +306,109 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Paths to save combined images
-    out_paths: Dict[str, str] = {
-        "val_acc": _to_posix((PLOTS_DIR / "combined_val_accuracy.png").relative_to(REPO_ROOT).as_posix()),
-        "val_loss": _to_posix((PLOTS_DIR / "combined_val_loss.png").relative_to(REPO_ROOT).as_posix()),
-        "train_acc": _to_posix((PLOTS_DIR / "combined_train_accuracy.png").relative_to(REPO_ROOT).as_posix()),
-        "train_loss": _to_posix((PLOTS_DIR / "combined_train_loss.png").relative_to(REPO_ROOT).as_posix()),
-    }
+    # out_paths: Dict[str, str] = {
+    #     "val_acc": _to_posix((PLOTS_DIR / "combined_val_accuracy.png").relative_to(REPO_ROOT).as_posix()),
+    #     "val_loss": _to_posix((PLOTS_DIR / "combined_val_loss.png").relative_to(REPO_ROOT).as_posix()),
+    #     "train_acc": _to_posix((PLOTS_DIR / "combined_train_accuracy.png").relative_to(REPO_ROOT).as_posix()),
+    #     "train_loss": _to_posix((PLOTS_DIR / "combined_train_loss.png").relative_to(REPO_ROOT).as_posix()),
+    # }
 
-    # Accumulate series
+    out_paths_top5: Dict[str, str] = {
+    "val_acc": _to_posix((PLOTS_DIR / "combined_val_accuracy_top5.png").relative_to(REPO_ROOT).as_posix()),
+    "val_loss": _to_posix((PLOTS_DIR / "combined_val_loss_top5.png").relative_to(REPO_ROOT).as_posix()),
+    "train_acc": _to_posix((PLOTS_DIR / "combined_train_accuracy_top5.png").relative_to(REPO_ROOT).as_posix()),
+    "train_loss": _to_posix((PLOTS_DIR / "combined_train_loss_top5.png").relative_to(REPO_ROOT).as_posix()),}
+    out_paths_all: Dict[str, str] = {
+        "val_acc": _to_posix((PLOTS_DIR / "combined_val_accuracy_all.png").relative_to(REPO_ROOT).as_posix()),
+        "val_loss": _to_posix((PLOTS_DIR / "combined_val_loss_all.png").relative_to(REPO_ROOT).as_posix()),
+        "train_acc": _to_posix((PLOTS_DIR / "combined_train_accuracy_all.png").relative_to(REPO_ROOT).as_posix()),
+        "train_loss": _to_posix((PLOTS_DIR / "combined_train_loss_all.png").relative_to(REPO_ROOT).as_posix()),}
+
+    # # Top-5 series lists Accumulate series
     series_val_acc: List[Tuple[str, pd.Series, pd.Series]] = []   # (label, epoch, val_acc)
     series_val_loss: List[Tuple[str, pd.Series, pd.Series]] = []  # (label, epoch, val_loss)
     series_tr_acc: List[Tuple[str, pd.Series, pd.Series]] = []
     series_tr_loss: List[Tuple[str, pd.Series, pd.Series]] = []
 
+    # NEW: All-experiments series lists
+    series_val_acc_all: List[Tuple[str, pd.Series, pd.Series]] = []
+    series_val_loss_all: List[Tuple[str, pd.Series, pd.Series]] = []
+    series_tr_acc_all: List[Tuple[str, pd.Series, pd.Series]] = []
+    series_tr_loss_all: List[Tuple[str, pd.Series, pd.Series]] = []
+
+    ## plot all experiments in train and val accuaracy and loss plots
+    # for _, r in df.iterrows():
+    #     label = str(r.get("exp_name", ""))
+    #     epoch_csv = str(r.get("epoch_csv", ""))
+    #     ep_df = _read_epoch_csv(epoch_csv)
+    #     if ep_df is None:
+    #         continue
+
+    #     # Identify columns
+    #     epoch_col = "epoch"
+    #     val_acc_col = _pick_col(ep_df, ["val_acc", "val_accuracy", "valid_acc", "valid_accuracy"])
+    #     val_loss_col = _pick_col(ep_df, ["val_loss", "valid_loss"])
+    #     tr_acc_col = _pick_col(ep_df, ["train_acc", "accuracy", "acc"])  # beware: 'accuracy' might be train in some logs
+    #     tr_loss_col = _pick_col(ep_df, ["train_loss", "loss"])           # 'loss' alone likely train loss
+
+    #     # Collect series if present
+    #     if val_acc_col and pd.api.types.is_numeric_dtype(ep_df[val_acc_col]):
+    #         series_val_acc.append((label, ep_df[epoch_col], ep_df[val_acc_col]))
+    #     if val_loss_col and pd.api.types.is_numeric_dtype(ep_df[val_loss_col]):
+    #         series_val_loss.append((label, ep_df[epoch_col], ep_df[val_loss_col]))
+    #     if tr_acc_col and pd.api.types.is_numeric_dtype(ep_df[tr_acc_col]):
+    #         series_tr_acc.append((label, ep_df[epoch_col], ep_df[tr_acc_col]))
+    #     if tr_loss_col and pd.api.types.is_numeric_dtype(ep_df[tr_loss_col]):
+    #         series_tr_loss.append((label, ep_df[epoch_col], ep_df[tr_loss_col]))
+
+    ## plot all experiments in train and val accuaracy and loss plots
+    # --- Build series for ALL experiments ---
     for _, r in df.iterrows():
-        label = str(r.get("exp_name", ""))
+        raw_name = str(r.get("exp_name", ""))
+        label_all = prettify_label(raw_name)
         epoch_csv = str(r.get("epoch_csv", ""))
-        ep_df = _read_epoch_csv(epoch_csv)
+        ep_df = _read_epoch_csv(epoch_csv, raw_name)
+        if ep_df is None:
+            continue
+
+        epoch_col = "epoch"
+        val_acc_col = _pick_col(ep_df, ["val_acc", "val_accuracy", "valid_acc", "valid_accuracy"])
+        val_loss_col = _pick_col(ep_df, ["val_loss", "valid_loss"])
+        tr_acc_col = _pick_col(ep_df, ["train_acc", "accuracy", "acc"])
+        tr_loss_col = _pick_col(ep_df, ["train_loss", "loss"])
+
+        if val_acc_col and pd.api.types.is_numeric_dtype(ep_df[val_acc_col]):
+            series_val_acc_all.append((label_all, ep_df[epoch_col], ep_df[val_acc_col]))
+        if val_loss_col and pd.api.types.is_numeric_dtype(ep_df[val_loss_col]):
+            series_val_loss_all.append((label_all, ep_df[epoch_col], ep_df[val_loss_col]))
+        if tr_acc_col and pd.api.types.is_numeric_dtype(ep_df[tr_acc_col]):
+            series_tr_acc_all.append((label_all, ep_df[epoch_col], ep_df[tr_acc_col]))
+        if tr_loss_col and pd.api.types.is_numeric_dtype(ep_df[tr_loss_col]):
+            series_tr_loss_all.append((label_all, ep_df[epoch_col], ep_df[tr_loss_col]))
+
+    # --- Pick Top-5 experiments by val_acc desc, then params asc, val_loss asc, train_time asc ---
+    df_sorted_for_top = df.copy()
+    df_sorted_for_top["val_acc"] = pd.to_numeric(df_sorted_for_top["val_acc"], errors="coerce")
+    df_sorted_for_top["params"] = pd.to_numeric(df_sorted_for_top["params"], errors="coerce")
+    df_sorted_for_top["val_loss"] = pd.to_numeric(df_sorted_for_top["val_loss"], errors="coerce")
+    df_sorted_for_top["train_time_sec"] = pd.to_numeric(df_sorted_for_top["train_time_sec"], errors="coerce")
+    df_sorted_for_top = df_sorted_for_top.sort_values(
+        by=["val_acc", "params", "val_loss", "train_time_sec"],
+        ascending=[False, True, True, True],
+        kind="mergesort"
+    ).reset_index(drop=True)
+
+    top5 = df_sorted_for_top.head(5)
+    picked_names = [str(r.get("exp_name", "")) for _, r in top5.iterrows()]
+
+    for _, r in top5.iterrows():
+        # label = str(r.get("exp_name", ""))
+        # epoch_csv = str(r.get("epoch_csv", ""))
+        # ep_df = _read_epoch_csv(epoch_csv)
+        label = prettify_label(str(r.get("exp_name", "")))
+        epoch_csv = str(r.get("epoch_csv", ""))
+        ep_df = _read_epoch_csv(epoch_csv, str(r.get("exp_name", "")))
+
         if ep_df is None:
             continue
 
@@ -266,8 +416,8 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
         epoch_col = "epoch"
         val_acc_col = _pick_col(ep_df, ["val_acc", "val_accuracy", "valid_acc", "valid_accuracy"])
         val_loss_col = _pick_col(ep_df, ["val_loss", "valid_loss"])
-        tr_acc_col = _pick_col(ep_df, ["train_acc", "accuracy", "acc"])  # beware: 'accuracy' might be train in some logs
-        tr_loss_col = _pick_col(ep_df, ["train_loss", "loss"])           # 'loss' alone likely train loss
+        tr_acc_col = _pick_col(ep_df, ["train_acc", "accuracy", "acc"])
+        tr_loss_col = _pick_col(ep_df, ["train_loss", "loss"])
 
         # Collect series if present
         if val_acc_col and pd.api.types.is_numeric_dtype(ep_df[val_acc_col]):
@@ -280,42 +430,100 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
             series_tr_loss.append((label, ep_df[epoch_col], ep_df[tr_loss_col]))
 
     # Helper to plot lists
+    # def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
+    #     if not series_list:
+    #         return False
+    #     plt.figure()
+    #     for label, x, y in series_list:
+    #         try:
+    #             plt.plot(x.values, y.values, label=label)
+    #         except Exception:
+    #             continue
+    #     plt.title(title)
+    #     plt.xlabel(xlabel)
+    #     plt.ylabel(ylabel)
+    #     plt.legend(loc="best", fontsize="small", ncol=1)
+    #     plt.grid(True, alpha=0.3)
+    #     # Save
+    #     out_file = REPO_ROOT / save_as
+    #     out_file.parent.mkdir(parents=True, exist_ok=True)
+    #     plt.tight_layout()
+    #     plt.savefig(out_file, dpi=150)
+    #     plt.close()
+    #     return True
     def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
         if not series_list:
             return False
-        plt.figure()
+
+        fig, ax = plt.subplots(figsize=(10, 6))  # bigger canvas
         for label, x, y in series_list:
             try:
-                plt.plot(x.values, y.values, label=label)
+                ax.plot(x.values, y.values, label=label, linewidth=1.5)
             except Exception:
                 continue
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.legend(loc="best", fontsize="small", ncol=1)
-        plt.grid(True, alpha=0.3)
-        # Save
+
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+
+        # Legend outside, auto columns
+        ncol = 2 if len(series_list) > 4 else 1
+        ax.legend(
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
+            fontsize="small",
+            frameon=False,
+            ncol=ncol,
+            borderaxespad=0.0
+        )
+
+        fig.tight_layout(rect=[0, 0, 0.80, 1])  # leave room on right for legend
+
         out_file = REPO_ROOT / save_as
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        plt.tight_layout()
-        plt.savefig(out_file, dpi=150)
-        plt.close()
+        fig.savefig(out_file, dpi=150)
+        plt.close(fig)
         return True
 
-    # Generate plots
-    has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (All Experiments)", "Epoch", "Val Accuracy", out_paths["val_acc"])
-    has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (All Experiments)", "Epoch", "Val Loss", out_paths["val_loss"])
-    has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (All Experiments)",  "Epoch", "Train Accuracy", out_paths["train_acc"])
-    has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (All Experiments)",      "Epoch", "Train Loss", out_paths["train_loss"])
+
+    # # Generate plots
+    # has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (All Experiments)", "Epoch", "Val Accuracy", out_paths["val_acc"])
+    # has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (All Experiments)", "Epoch", "Val Loss", out_paths["val_loss"])
+    # has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (All Experiments)",  "Epoch", "Train Accuracy", out_paths["train_acc"])
+    # has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (All Experiments)",      "Epoch", "Train Loss", out_paths["train_loss"])
+
+    # First: ALL experiments
+    has_val_acc_all = _plot_series(series_val_acc_all, "Validation Accuracy vs Epoch (All Experiments)", "Epoch", "Val Accuracy", out_paths_all["val_acc"])
+    has_val_loss_all = _plot_series(series_val_loss_all, "Validation Loss vs Epoch (All Experiments)", "Epoch", "Val Loss", out_paths_all["val_loss"])
+    has_tr_acc_all  = _plot_series(series_tr_acc_all,  "Training Accuracy vs Epoch (All Experiments)",  "Epoch", "Train Accuracy", out_paths_all["train_acc"])
+    has_tr_loss_all = _plot_series(series_tr_loss_all, "Training Loss vs Epoch (All Experiments)",      "Epoch", "Train Loss", out_paths_all["train_loss"])
+
+    # Then: TOP-5 only
+    has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (Top 5 Experiments)", "Epoch", "Val Accuracy", out_paths_top5["val_acc"])
+    has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (Top 5 Experiments)", "Epoch", "Val Loss", out_paths_top5["val_loss"])
+    has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (Top 5 Experiments)",  "Epoch", "Train Accuracy", out_paths_top5["train_acc"])
+    has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (Top 5 Experiments)",      "Epoch", "Train Loss", out_paths_top5["train_loss"])
+
+
 
     # Only return those that were actually generated
     generated = {}
-    if has_val_acc: generated["val_acc"] = out_paths["val_acc"]
-    if has_val_loss: generated["val_loss"] = out_paths["val_loss"]
-    if has_tr_acc: generated["train_acc"] = out_paths["train_acc"]
-    if has_tr_loss: generated["train_loss"] = out_paths["train_loss"]
-    return generated
 
+    # TOP-5: these are the ones the README will embed
+    if has_val_acc: generated["val_acc"] = out_paths_top5["val_acc"]
+    if has_val_loss: generated["val_loss"] = out_paths_top5["val_loss"]
+    if has_tr_acc: generated["train_acc"] = out_paths_top5["train_acc"]
+    if has_tr_loss: generated["train_loss"] = out_paths_top5["train_loss"]
+
+    # ALL: returned under separate keys (README won’t use them, but files are created)
+    if has_val_acc_all: generated["val_acc_all"] = out_paths_all["val_acc"]
+    if has_val_loss_all: generated["val_loss_all"] = out_paths_all["val_loss"]
+    if has_tr_acc_all: generated["train_acc_all"] = out_paths_all["train_acc"]
+    if has_tr_loss_all: generated["train_loss_all"] = out_paths_all["train_loss"]
+
+    generated["picked_list"] = picked_names
+    return generated
 
 # ---------- README Builder ----------
 def build_readme(df: pd.DataFrame) -> str:
@@ -511,22 +719,57 @@ python update_readme.py
     # Generate combined plots from per-epoch CSVs (if present)
     combined = generate_combined_plots(df_sorted)
 
-    combined_md_parts = ["## Combined Learning Curves (All Experiments)\n"]
+    #combined_md_parts = ["## Combined Learning Curves (All Experiments)\n"]
+    combined_md_parts = ["## Combined Learning Curves (Top 5 Experiments)\n"]
+        # List the five runs that were plotted
+    picked = combined.get("picked_list", [])
+    # if picked:
+    #     combined_md_parts.append("**Included runs:** " + ", ".join(f"`{name}`" for name in picked) + "\n")
+    if picked:
+        combined_md_parts.append("**Included runs (Top-5 by Val Acc → Params → Loss → Time):**\n")
+
+        # Keep order same as in picked_list (so table rows match legend colors)
+        df_top5 = df_sorted[df_sorted["exp_name"].isin(picked)].copy()
+        df_top5["order"] = pd.Categorical(df_top5["exp_name"], categories=picked, ordered=True)
+        df_top5 = df_top5.sort_values("order").drop(columns=["order"])
+
+        display_cols = ["exp_name", "val_acc", "val_loss", "params", "epochs", "best_epoch"]
+        df_top5_fmt = df_top5.copy()
+        df_top5_fmt["val_acc"] = df_top5_fmt["val_acc"].apply(lambda x: format_float(x, 2))
+        df_top5_fmt["val_loss"] = df_top5_fmt["val_loss"].apply(lambda x: format_float(x, 4))
+        df_top5_fmt["params"] = df_top5_fmt["params"].apply(lambda x: f"{int(x):,}" if not pd.isna(x) else "")
+        df_top5_fmt["epochs"] = df_top5_fmt["epochs"].apply(lambda x: str(int(x)) if not pd.isna(x) else "")
+        df_top5_fmt["best_epoch"] = df_top5_fmt["best_epoch"].apply(lambda x: str(int(x)) if not pd.isna(x) else "")
+
+        header = "| " + " | ".join(display_cols) + " |"
+        sep = "| " + " | ".join(["---"] * len(display_cols)) + " |"
+        lines = [header, sep]
+        for _, row in df_top5_fmt.iterrows():
+            vals = [str(row[c]) for c in display_cols]
+            lines.append("| " + " | ".join(vals) + " |")
+        combined_md_parts.append("\n".join(lines) + "\n")
+        combined_md_parts.append(
+            "_Note: Only Top-5 runs are shown below. "
+            "Full combined plots for **all experiments** are saved in "
+            "`results/plots/combined_*_all.png`._\n"
+        )
+
+
     if "val_acc" in combined:
-        combined_md_parts.append(md_image_or_note("Validation Accuracy (All Experiments)", combined["val_acc"]))
+        combined_md_parts.append(md_image_or_note("Validation Accuracy (Top 5 Experiments)", combined["val_acc"]))
     else:
         combined_md_parts.append("_Validation accuracy curves could not be generated (no per-epoch CSVs with a recognized `val_acc`)._\n")
 
     if "val_loss" in combined:
-        combined_md_parts.append(md_image_or_note("Validation Loss (All Experiments)", combined["val_loss"]))
+        combined_md_parts.append(md_image_or_note("Validation Loss (Top 5 Experiments)", combined["val_loss"]))
     else:
         combined_md_parts.append("_Validation loss curves could not be generated (no per-epoch CSVs with a recognized `val_loss`)._\n")
 
     # If training metrics were also found, include them
     if "train_acc" in combined:
-        combined_md_parts.append(md_image_or_note("Training Accuracy (All Experiments)", combined["train_acc"]))
+        combined_md_parts.append(md_image_or_note("Training Accuracy (Top 5 Experiments)", combined["train_acc"]))
     if "train_loss" in combined:
-        combined_md_parts.append(md_image_or_note("Training Loss (All Experiments)", combined["train_loss"]))
+        combined_md_parts.append(md_image_or_note("Training Loss (Top 5 Experiments)", combined["train_loss"]))
 
     combined_md = "\n".join(combined_md_parts)
 

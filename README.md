@@ -183,23 +183,35 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 ---
 
-## Combined Learning Curves (All Experiments)
+## Combined Learning Curves (Top 5 Experiments)
 
-**Validation Accuracy (All Experiments):**
+**Included runs (Top-5 by Val Acc → Params → Loss → Time):**
 
-![](results/plots/combined_val_accuracy.png)
+| exp_name | val_acc | val_loss | params | epochs | best_epoch |
+| --- | --- | --- | --- | --- | --- |
+| C_bs_sweep_sgd_onecycle_bs32 | 99.03 | 0.0328 | 15,882 | 2 | 2 |
+| C_bs_sweep_adam_onecycle_bs32 | 99.02 | 0.0325 | 15,882 | 2 | 2 |
+| C_bs_sweep_adam_onecycle_bs128 | 98.90 | 0.0433 | 15,882 | 2 | 2 |
+| C_bs_sweep_adamw_step_bs128 | 98.87 | 0.0419 | 15,882 | 2 | 2 |
+| C_bs_sweep_sgd_onecycle_bs64 | 98.85 | 0.0348 | 15,882 | 2 | 2 |
 
-**Validation Loss (All Experiments):**
+_Note: Only Top-5 runs are shown below. Full combined plots for **all experiments** are saved in `results/plots/combined_*_all.png`._
 
-![](results/plots/combined_val_loss.png)
+**Validation Accuracy (Top 5 Experiments):**
 
-**Training Accuracy (All Experiments):**
+![](results/plots/combined_val_accuracy_top5.png)
 
-![](results/plots/combined_train_accuracy.png)
+**Validation Loss (Top 5 Experiments):**
 
-**Training Loss (All Experiments):**
+![](results/plots/combined_val_loss_top5.png)
 
-![](results/plots/combined_train_loss.png)
+**Training Accuracy (Top 5 Experiments):**
+
+![](results/plots/combined_train_accuracy_top5.png)
+
+**Training Loss (Top 5 Experiments):**
+
+![](results/plots/combined_train_loss_top5.png)
 
 
 ---
