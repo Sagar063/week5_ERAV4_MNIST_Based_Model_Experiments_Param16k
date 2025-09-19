@@ -151,420 +151,420 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs32_acc.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs32_loss.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs32_cm.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs32_miscls.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_sgd_onecycle_bs32_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs32_metrics.csv`
 
 
 ### `C_bs_sweep_adam_onecycle_bs32`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs32_acc.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs32_loss.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs32_cm.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs32_miscls.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adam_onecycle_bs32_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs32_metrics.csv`
 
 
 ### `C_bs_sweep_adam_onecycle_bs128`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs128_acc.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs128_loss.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs128_cm.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs128_miscls.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adam_onecycle_bs128_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs128_metrics.csv`
 
 
 ### `C_bs_sweep_adamw_step_bs128`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs128_acc.png)
+![](results/plots/C_bs_sweep_adamw_step_bs128_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs128_loss.png)
+![](results/plots/C_bs_sweep_adamw_step_bs128_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs128_cm.png)
+![](results/plots/C_bs_sweep_adamw_step_bs128_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs128_miscls.png)
+![](results/plots/C_bs_sweep_adamw_step_bs128_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adamw_step_bs128_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs128_metrics.csv`
 
 
 ### `C_bs_sweep_sgd_onecycle_bs64`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs64_acc.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs64_loss.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs64_cm.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs64_miscls.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_sgd_onecycle_bs64_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs64_metrics.csv`
 
 
 ### `C_bs_sweep_adam_onecycle_bs64`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs64_acc.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs64_loss.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs64_cm.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adam_onecycle_bs64_miscls.png)
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adam_onecycle_bs64_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs64_metrics.csv`
 
 
 ### `D_activation_silu`
 
 **Accuracy:**
 
-![](results\plots\D_activation_silu_acc.png)
+![](results/plots/D_activation_silu_acc.png)
 
 **Loss:**
 
-![](results\plots\D_activation_silu_loss.png)
+![](results/plots/D_activation_silu_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\D_activation_silu_cm.png)
+![](results/plots/D_activation_silu_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\D_activation_silu_miscls.png)
+![](results/plots/D_activation_silu_miscls.png)
 
-- Per-epoch CSV: `results\D_activation_silu_metrics.csv`
+- Per-epoch CSV: `results/D_activation_silu_metrics.csv`
 
 
 ### `C_bs_sweep_adamw_step_bs32`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs32_acc.png)
+![](results/plots/C_bs_sweep_adamw_step_bs32_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs32_loss.png)
+![](results/plots/C_bs_sweep_adamw_step_bs32_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs32_cm.png)
+![](results/plots/C_bs_sweep_adamw_step_bs32_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs32_miscls.png)
+![](results/plots/C_bs_sweep_adamw_step_bs32_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adamw_step_bs32_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs32_metrics.csv`
 
 
 ### `C_bs_sweep_adamw_step_bs64`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs64_acc.png)
+![](results/plots/C_bs_sweep_adamw_step_bs64_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs64_loss.png)
+![](results/plots/C_bs_sweep_adamw_step_bs64_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs64_cm.png)
+![](results/plots/C_bs_sweep_adamw_step_bs64_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_adamw_step_bs64_miscls.png)
+![](results/plots/C_bs_sweep_adamw_step_bs64_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_adamw_step_bs64_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs64_metrics.csv`
 
 
 ### `C_bs_sweep_sgd_onecycle_bs128`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs128_acc.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs128_loss.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs128_cm.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_sgd_onecycle_bs128_miscls.png)
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_sgd_onecycle_bs128_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs128_metrics.csv`
 
 
 ### `B_bn_do_sgd_onecycle`
 
 **Accuracy:**
 
-![](results\plots\B_bn_do_sgd_onecycle_acc.png)
+![](results/plots/B_bn_do_sgd_onecycle_acc.png)
 
 **Loss:**
 
-![](results\plots\B_bn_do_sgd_onecycle_loss.png)
+![](results/plots/B_bn_do_sgd_onecycle_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\B_bn_do_sgd_onecycle_cm.png)
+![](results/plots/B_bn_do_sgd_onecycle_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\B_bn_do_sgd_onecycle_miscls.png)
+![](results/plots/B_bn_do_sgd_onecycle_miscls.png)
 
-- Per-epoch CSV: `results\B_bn_do_sgd_onecycle_metrics.csv`
+- Per-epoch CSV: `results/B_bn_do_sgd_onecycle_metrics.csv`
 
 
 ### `B_bn_do_adam_onecycle`
 
 **Accuracy:**
 
-![](results\plots\B_bn_do_adam_onecycle_acc.png)
+![](results/plots/B_bn_do_adam_onecycle_acc.png)
 
 **Loss:**
 
-![](results\plots\B_bn_do_adam_onecycle_loss.png)
+![](results/plots/B_bn_do_adam_onecycle_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\B_bn_do_adam_onecycle_cm.png)
+![](results/plots/B_bn_do_adam_onecycle_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\B_bn_do_adam_onecycle_miscls.png)
+![](results/plots/B_bn_do_adam_onecycle_miscls.png)
 
-- Per-epoch CSV: `results\B_bn_do_adam_onecycle_metrics.csv`
+- Per-epoch CSV: `results/B_bn_do_adam_onecycle_metrics.csv`
 
 
 ### `B_bn_do_adamw_step`
 
 **Accuracy:**
 
-![](results\plots\B_bn_do_adamw_step_acc.png)
+![](results/plots/B_bn_do_adamw_step_acc.png)
 
 **Loss:**
 
-![](results\plots\B_bn_do_adamw_step_loss.png)
+![](results/plots/B_bn_do_adamw_step_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\B_bn_do_adamw_step_cm.png)
+![](results/plots/B_bn_do_adamw_step_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\B_bn_do_adamw_step_miscls.png)
+![](results/plots/B_bn_do_adamw_step_miscls.png)
 
-- Per-epoch CSV: `results\B_bn_do_adamw_step_metrics.csv`
+- Per-epoch CSV: `results/B_bn_do_adamw_step_metrics.csv`
 
 
 ### `B_bn_do_rmsprop_plateau`
 
 **Accuracy:**
 
-![](results\plots\B_bn_do_rmsprop_plateau_acc.png)
+![](results/plots/B_bn_do_rmsprop_plateau_acc.png)
 
 **Loss:**
 
-![](results\plots\B_bn_do_rmsprop_plateau_loss.png)
+![](results/plots/B_bn_do_rmsprop_plateau_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\B_bn_do_rmsprop_plateau_cm.png)
+![](results/plots/B_bn_do_rmsprop_plateau_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\B_bn_do_rmsprop_plateau_miscls.png)
+![](results/plots/B_bn_do_rmsprop_plateau_miscls.png)
 
-- Per-epoch CSV: `results\B_bn_do_rmsprop_plateau_metrics.csv`
+- Per-epoch CSV: `results/B_bn_do_rmsprop_plateau_metrics.csv`
 
 
 ### `D_activation_relu`
 
 **Accuracy:**
 
-![](results\plots\D_activation_relu_acc.png)
+![](results/plots/D_activation_relu_acc.png)
 
 **Loss:**
 
-![](results\plots\D_activation_relu_loss.png)
+![](results/plots/D_activation_relu_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\D_activation_relu_cm.png)
+![](results/plots/D_activation_relu_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\D_activation_relu_miscls.png)
+![](results/plots/D_activation_relu_miscls.png)
 
-- Per-epoch CSV: `results\D_activation_relu_metrics.csv`
+- Per-epoch CSV: `results/D_activation_relu_metrics.csv`
 
 
 ### `C_bs_sweep_rmsprop_plateau_bs64`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs64_acc.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs64_loss.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs64_cm.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs64_miscls.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_rmsprop_plateau_bs64_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs64_metrics.csv`
 
 
 ### `C_bs_sweep_rmsprop_plateau_bs32`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs32_acc.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs32_loss.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs32_cm.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs32_miscls.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_rmsprop_plateau_bs32_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs32_metrics.csv`
 
 
 ### `D_activation_gelu`
 
 **Accuracy:**
 
-![](results\plots\D_activation_gelu_acc.png)
+![](results/plots/D_activation_gelu_acc.png)
 
 **Loss:**
 
-![](results\plots\D_activation_gelu_loss.png)
+![](results/plots/D_activation_gelu_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\D_activation_gelu_cm.png)
+![](results/plots/D_activation_gelu_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\D_activation_gelu_miscls.png)
+![](results/plots/D_activation_gelu_miscls.png)
 
-- Per-epoch CSV: `results\D_activation_gelu_metrics.csv`
+- Per-epoch CSV: `results/D_activation_gelu_metrics.csv`
 
 
 ### `C_bs_sweep_rmsprop_plateau_bs128`
 
 **Accuracy:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs128_acc.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_acc.png)
 
 **Loss:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs128_loss.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs128_cm.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\C_bs_sweep_rmsprop_plateau_bs128_miscls.png)
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_miscls.png)
 
-- Per-epoch CSV: `results\C_bs_sweep_rmsprop_plateau_bs128_metrics.csv`
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs128_metrics.csv`
 
 
 ### `A_noBN_noDO_vanillaGD`
 
 **Accuracy:**
 
-![](results\plots\A_noBN_noDO_vanillaGD_acc.png)
+![](results/plots/A_noBN_noDO_vanillaGD_acc.png)
 
 **Loss:**
 
-![](results\plots\A_noBN_noDO_vanillaGD_loss.png)
+![](results/plots/A_noBN_noDO_vanillaGD_loss.png)
 
 **Confusion Matrix:**
 
-![](results\plots\A_noBN_noDO_vanillaGD_cm.png)
+![](results/plots/A_noBN_noDO_vanillaGD_cm.png)
 
 **Misclassified Samples:**
 
-![](results\plots\A_noBN_noDO_vanillaGD_miscls.png)
+![](results/plots/A_noBN_noDO_vanillaGD_miscls.png)
 
-- Per-epoch CSV: `results\A_noBN_noDO_vanillaGD_metrics.csv`
+- Per-epoch CSV: `results/A_noBN_noDO_vanillaGD_metrics.csv`
 
 
 ---

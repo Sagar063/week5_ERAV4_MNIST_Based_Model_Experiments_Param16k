@@ -6,7 +6,7 @@ update_readme.py
 
 Regenerates README.md for the MNIST experiments repo.
 
-Assumptions (per user request):
+Assumptions:
 - results/results.csv already uses the latest 21-column schema (NO mixed/old rows handling).
 
 What this script does:
@@ -56,6 +56,19 @@ SECTION_DIVIDER = "\n---\n"
 # ---------- Helpers ----------
 def err(msg: str) -> None:
     print(f"[update_readme] {msg}", file=sys.stderr)
+
+
+def _to_posix(rel_path: str) -> str:
+    """
+    Convert Windows-style paths (with backslashes) to POSIX-style forward slashes
+    so GitHub Markdown can render images/links. Also trims a leading './'.
+    """
+    if not rel_path:
+        return ""
+    s = Path(rel_path).as_posix()
+    if s.startswith("./"):
+        s = s[2:]
+    return s
 
 
 def file_exists(rel_path: str) -> bool:
@@ -128,9 +141,10 @@ def config_summary(r: pd.Series) -> str:
 
 
 def md_image_or_note(title: str, rel_path: str) -> str:
+    posix_path = _to_posix(rel_path)
     if rel_path and file_exists(rel_path):
-        return f"**{title}:**\n\n![]({rel_path})\n"
-    missing_path = rel_path if rel_path else "(not provided)"
+        return f"**{title}:**\n\n![]({posix_path})\n"
+    missing_path = posix_path if posix_path else "(not provided)"
     return f"**{title}:** _Missing at '{missing_path}'_\n"
 
 
@@ -325,9 +339,9 @@ Softmax: 10
         block.append(md_image_or_note("Misclassified Samples", mis_plot))
 
         if epoch_csv and file_exists(epoch_csv):
-            block.append(f"- Per-epoch CSV: `{epoch_csv}`\n")
+            block.append(f"- Per-epoch CSV: `{_to_posix(epoch_csv)}`\n")
         else:
-            missing = epoch_csv if epoch_csv else "(not provided)"
+            missing = _to_posix(epoch_csv) if epoch_csv else "(not provided)"
             block.append(f"- Per-epoch CSV: _Missing at '{missing}'_\n")
 
         diags.append("\n".join(block))
