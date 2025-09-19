@@ -142,13 +142,13 @@ Softmax → class probabilities
 
 ## Best Result (So Far)
 
-- **Experiment:** `C_bs_sweep_sgd_onecycle_bs32`
-- **Val Acc:** 99.03%
-- **Val Loss:** 0.0328
+- **Experiment:** `C_bs_sweep_sgd_onecycle_bs64`
+- **Val Acc:** 99.52%
+- **Val Loss:** 0.0151
 - **Params:** 15,882
-- **Epochs:** 2
-- **Best Epoch:** 2
-- **Config:** BN: True | Dropout: 0.050 | Activation: relu | Optimizer+Scheduler: sgd + onecycle | LR: 0.05000 | BatchSize: 32 | Epochs: 2
+- **Epochs:** 20
+- **Best Epoch:** 18
+- **Config:** BN: True | Dropout: 0.050 | Activation: relu | Optimizer+Scheduler: sgd + onecycle | LR: 0.05000 | BatchSize: 64 | Epochs: 20
 
 
 ---
@@ -159,12 +159,32 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 | exp_name | use_bn | dropout_p | activation | optimizer | scheduler | lr | batch_size | epochs | params | val_acc | val_loss | best_epoch | train_time_sec |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| C_bs_sweep_sgd_onecycle_bs64 | True | 0.050 | relu | sgd | onecycle | 0.05000 | 64 | 20 | 15882 | 99.52 | 0.0151 | 18 | 229.2 |
+| B_bn_do_adam_onecycle | True | 0.050 | relu | adam | onecycle | 0.00300 | 128 | 20 | 15882 | 99.49 | 0.0157 | 18 | 204.4 |
+| C_bs_sweep_sgd_onecycle_bs32 | True | 0.050 | relu | sgd | onecycle | 0.05000 | 32 | 20 | 15882 | 99.49 | 0.0169 | 20 | 249.2 |
+| C_bs_sweep_adam_onecycle_bs128 | True | 0.050 | relu | adam | onecycle | 0.00300 | 128 | 20 | 15882 | 99.48 | 0.0165 | 17 | 210.3 |
+| C_bs_sweep_adam_onecycle_bs32 | True | 0.050 | relu | adam | onecycle | 0.00300 | 32 | 20 | 15882 | 99.47 | 0.0163 | 16 | 250.7 |
+| B_bn_do_adamw_step | True | 0.050 | relu | adamw | step | 0.00250 | 128 | 20 | 15882 | 99.47 | 0.0175 | 11 | 206.9 |
+| C_bs_sweep_adamw_step_bs64 | True | 0.050 | relu | adamw | step | 0.00250 | 64 | 20 | 15882 | 99.46 | 0.0167 | 19 | 229.1 |
+| C_bs_sweep_adamw_step_bs32 | True | 0.050 | relu | adamw | step | 0.00250 | 32 | 20 | 15882 | 99.45 | 0.0186 | 17 | 249.3 |
+| B_bn_do_sgd_onecycle | True | 0.050 | relu | sgd | onecycle | 0.05000 | 128 | 20 | 15882 | 99.44 | 0.0176 | 18 | 204.5 |
+| C_bs_sweep_rmsprop_plateau_bs128 | True | 0.050 | relu | rmsprop | plateau | 0.00100 | 128 | 20 | 15882 | 99.42 | 0.0198 | 17 | 226.8 |
+| C_bs_sweep_sgd_onecycle_bs128 | True | 0.050 | relu | sgd | onecycle | 0.05000 | 128 | 20 | 15882 | 99.40 | 0.0189 | 18 | 203.1 |
+| C_bs_sweep_adam_onecycle_bs64 | True | 0.050 | relu | adam | onecycle | 0.00300 | 64 | 20 | 15882 | 99.40 | 0.0193 | 19 | 229.7 |
+| D_activation_silu | True | 0.050 | silu | adamw | step | 0.00250 | 128 | 20 | 15882 | 99.36 | 0.0207 | 14 | 364.0 |
+| D_activation_relu | True | 0.050 | relu | adamw | step | 0.00250 | 128 | 20 | 15882 | 99.33 | 0.0219 | 16 | 323.3 |
+| B_bn_do_rmsprop_plateau | True | 0.050 | relu | rmsprop | plateau | 0.00100 | 128 | 20 | 15882 | 99.32 | 0.0196 | 19 | 218.4 |
+| D_activation_gelu | True | 0.050 | gelu | adamw | step | 0.00250 | 128 | 20 | 15882 | 99.30 | 0.0204 | 12 | 419.6 |
+| C_bs_sweep_adamw_step_bs128 | True | 0.050 | relu | adamw | step | 0.00250 | 128 | 20 | 15882 | 99.26 | 0.0214 | 16 | 209.9 |
+| C_bs_sweep_rmsprop_plateau_bs64 | True | 0.050 | relu | rmsprop | plateau | 0.00100 | 64 | 20 | 15882 | 99.20 | 0.0247 | 13 | 249.6 |
+| C_bs_sweep_rmsprop_plateau_bs32 | True | 0.050 | relu | rmsprop | plateau | 0.00100 | 32 | 20 | 15882 | 99.04 | 0.0287 | 17 | 278.3 |
 | C_bs_sweep_sgd_onecycle_bs32 | True | 0.050 | relu | sgd | onecycle | 0.05000 | 32 | 2 | 15882 | 99.03 | 0.0328 | 2 | 24.2 |
 | C_bs_sweep_adam_onecycle_bs32 | True | 0.050 | relu | adam | onecycle | 0.00300 | 32 | 2 | 15882 | 99.02 | 0.0325 | 2 | 24.3 |
 | C_bs_sweep_adam_onecycle_bs128 | True | 0.050 | relu | adam | onecycle | 0.00300 | 128 | 2 | 15882 | 98.90 | 0.0433 | 2 | 20.1 |
 | C_bs_sweep_adamw_step_bs128 | True | 0.050 | relu | adamw | step | 0.00250 | 128 | 2 | 15882 | 98.87 | 0.0419 | 2 | 20.0 |
 | C_bs_sweep_sgd_onecycle_bs64 | True | 0.050 | relu | sgd | onecycle | 0.05000 | 64 | 2 | 15882 | 98.85 | 0.0348 | 2 | 22.0 |
 | C_bs_sweep_adam_onecycle_bs64 | True | 0.050 | relu | adam | onecycle | 0.00300 | 64 | 2 | 15882 | 98.85 | 0.0367 | 2 | 22.1 |
+| A_noBN_noDO_vanillaGD | False | 0.000 | relu | vanilla |  | 0.10000 | 128 | 20 | 15774 | 98.81 | 0.0358 | 20 | 207.6 |
 | D_activation_silu | True | 0.050 | silu | adamw | step | 0.00250 | 128 | 2 | 15882 | 98.72 | 0.0467 | 2 | 19.9 |
 | C_bs_sweep_adamw_step_bs32 | True | 0.050 | relu | adamw | step | 0.00250 | 32 | 2 | 15882 | 98.71 | 0.0417 | 2 | 24.1 |
 | C_bs_sweep_adamw_step_bs64 | True | 0.050 | relu | adamw | step | 0.00250 | 64 | 2 | 15882 | 98.61 | 0.0456 | 2 | 22.1 |
@@ -189,11 +209,16 @@ _Sorted by **Val Acc (desc)**, then **Params (asc)**, **Val Loss (asc)**, **Trai
 
 | exp_name | val_acc | val_loss | params | epochs | best_epoch |
 | --- | --- | --- | --- | --- | --- |
-| C_bs_sweep_sgd_onecycle_bs32 | 99.03 | 0.0328 | 15,882 | 2 | 2 |
-| C_bs_sweep_adam_onecycle_bs32 | 99.02 | 0.0325 | 15,882 | 2 | 2 |
-| C_bs_sweep_adam_onecycle_bs128 | 98.90 | 0.0433 | 15,882 | 2 | 2 |
-| C_bs_sweep_adamw_step_bs128 | 98.87 | 0.0419 | 15,882 | 2 | 2 |
+| C_bs_sweep_sgd_onecycle_bs64 | 99.52 | 0.0151 | 15,882 | 20 | 18 |
 | C_bs_sweep_sgd_onecycle_bs64 | 98.85 | 0.0348 | 15,882 | 2 | 2 |
+| B_bn_do_adam_onecycle | 99.49 | 0.0157 | 15,882 | 20 | 18 |
+| B_bn_do_adam_onecycle | 98.39 | 0.0545 | 15,882 | 2 | 2 |
+| C_bs_sweep_sgd_onecycle_bs32 | 99.49 | 0.0169 | 15,882 | 20 | 20 |
+| C_bs_sweep_sgd_onecycle_bs32 | 99.03 | 0.0328 | 15,882 | 2 | 2 |
+| C_bs_sweep_adam_onecycle_bs128 | 99.48 | 0.0165 | 15,882 | 20 | 17 |
+| C_bs_sweep_adam_onecycle_bs128 | 98.90 | 0.0433 | 15,882 | 2 | 2 |
+| C_bs_sweep_adam_onecycle_bs32 | 99.47 | 0.0163 | 15,882 | 20 | 16 |
+| C_bs_sweep_adam_onecycle_bs32 | 99.02 | 0.0325 | 15,882 | 2 | 2 |
 
 _Note: Only Top-5 runs are shown below. Full combined plots for **all experiments** are saved in `results/plots/combined_*_all.png`._
 
@@ -217,6 +242,253 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 ---
 
 ## Learning Curves & Diagnostics (Per Experiment)
+
+
+### `C_bs_sweep_sgd_onecycle_bs64`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs64_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs64_metrics.csv`
+
+
+### `B_bn_do_adam_onecycle`
+
+**Confusion Matrix:**
+
+![](results/plots/B_bn_do_adam_onecycle_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/B_bn_do_adam_onecycle_miscls.png)
+
+- Per-epoch CSV: `results/B_bn_do_adam_onecycle_metrics.csv`
+
+
+### `C_bs_sweep_sgd_onecycle_bs32`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs32_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs32_metrics.csv`
+
+
+### `C_bs_sweep_adam_onecycle_bs128`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs128_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs128_metrics.csv`
+
+
+### `C_bs_sweep_adam_onecycle_bs32`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs32_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs32_metrics.csv`
+
+
+### `B_bn_do_adamw_step`
+
+**Confusion Matrix:**
+
+![](results/plots/B_bn_do_adamw_step_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/B_bn_do_adamw_step_miscls.png)
+
+- Per-epoch CSV: `results/B_bn_do_adamw_step_metrics.csv`
+
+
+### `C_bs_sweep_adamw_step_bs64`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs64_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs64_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs64_metrics.csv`
+
+
+### `C_bs_sweep_adamw_step_bs32`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs32_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs32_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs32_metrics.csv`
+
+
+### `B_bn_do_sgd_onecycle`
+
+**Confusion Matrix:**
+
+![](results/plots/B_bn_do_sgd_onecycle_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/B_bn_do_sgd_onecycle_miscls.png)
+
+- Per-epoch CSV: `results/B_bn_do_sgd_onecycle_metrics.csv`
+
+
+### `C_bs_sweep_rmsprop_plateau_bs128`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs128_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs128_metrics.csv`
+
+
+### `C_bs_sweep_sgd_onecycle_bs128`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_sgd_onecycle_bs128_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_sgd_onecycle_bs128_metrics.csv`
+
+
+### `C_bs_sweep_adam_onecycle_bs64`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adam_onecycle_bs64_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs64_metrics.csv`
+
+
+### `D_activation_silu`
+
+**Confusion Matrix:**
+
+![](results/plots/D_activation_silu_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/D_activation_silu_miscls.png)
+
+- Per-epoch CSV: `results/D_activation_silu_metrics.csv`
+
+
+### `D_activation_relu`
+
+**Confusion Matrix:**
+
+![](results/plots/D_activation_relu_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/D_activation_relu_miscls.png)
+
+- Per-epoch CSV: `results/D_activation_relu_metrics.csv`
+
+
+### `B_bn_do_rmsprop_plateau`
+
+**Confusion Matrix:**
+
+![](results/plots/B_bn_do_rmsprop_plateau_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/B_bn_do_rmsprop_plateau_miscls.png)
+
+- Per-epoch CSV: `results/B_bn_do_rmsprop_plateau_metrics.csv`
+
+
+### `D_activation_gelu`
+
+**Confusion Matrix:**
+
+![](results/plots/D_activation_gelu_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/D_activation_gelu_miscls.png)
+
+- Per-epoch CSV: `results/D_activation_gelu_metrics.csv`
+
+
+### `C_bs_sweep_adamw_step_bs128`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs128_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_adamw_step_bs128_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_adamw_step_bs128_metrics.csv`
+
+
+### `C_bs_sweep_rmsprop_plateau_bs64`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs64_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs64_metrics.csv`
+
+
+### `C_bs_sweep_rmsprop_plateau_bs32`
+
+**Confusion Matrix:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/C_bs_sweep_rmsprop_plateau_bs32_miscls.png)
+
+- Per-epoch CSV: `results/C_bs_sweep_rmsprop_plateau_bs32_metrics.csv`
 
 
 ### `C_bs_sweep_sgd_onecycle_bs32`
@@ -295,6 +567,19 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 ![](results/plots/C_bs_sweep_adam_onecycle_bs64_miscls.png)
 
 - Per-epoch CSV: `results/C_bs_sweep_adam_onecycle_bs64_metrics.csv`
+
+
+### `A_noBN_noDO_vanillaGD`
+
+**Confusion Matrix:**
+
+![](results/plots/A_noBN_noDO_vanillaGD_cm.png)
+
+**Misclassified Samples:**
+
+![](results/plots/A_noBN_noDO_vanillaGD_miscls.png)
+
+- Per-epoch CSV: `results/A_noBN_noDO_vanillaGD_metrics.csv`
 
 
 ### `D_activation_silu`

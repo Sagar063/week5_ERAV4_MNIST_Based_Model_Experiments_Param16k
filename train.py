@@ -360,7 +360,7 @@ def main():
 
     results_csv = args.results_csv
     for cfg in grid:
-        cfg["epochs"] = 2
+        cfg["epochs"] = 20
     for cfg in grid:
         exp_name = cfg.pop("exp_name")
         print(f"\n=== Running {exp_name} ===")
