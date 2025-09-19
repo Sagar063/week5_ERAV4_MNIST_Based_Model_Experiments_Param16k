@@ -217,6 +217,7 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 ---
 
 ## Conclusions
+
 ### A. Baseline (no BN/Dropout, vanilla SGD)
 - `A_noBN_noDO_vanillaGD` peaked at **98.81%** with 15774 params.
   → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.
@@ -225,22 +226,23 @@ _Note: Only Top-5 runs are shown below. Full combined plots for **all experiment
 - Adam OneCycle best: `B_bn_do_adam_onecycle` → **99.49%** (val loss 0.0157).
 - AdamW StepLR strong: `B_bn_do_adamw_step` → **99.47%**, faster convergence (best epoch 11).
 - SGD OneCycle: `B_bn_do_sgd_onecycle` → **99.44%**.
-- RMSprop Plateau weaker, around 99.32%.
+- RMSprop Plateau weaker, around **99.32%**.
 
 ### C. BN + Dropout + Batch-Size Sweep
-- Best overall run: `C_bs_sweep_sgd_onecycle_bs64` → **99.52%** (val loss 0.0151) at epoch 18/20, 15,882 params.
+- Best overall run (within C): `C_bs_sweep_sgd_onecycle_bs64` → **99.52%** (val loss 0.0151).
 - Batch size sweet spot at **64**: stable convergence and top accuracy.
 
 ### D. BN + Dropout + Activations
-- Best activation: silu → **99.36%** (under AdamW+StepLR).
+- Best activation: **silu** → **99.36%** (under AdamW+StepLR).
 - Differences modest on MNIST (<0.1%).
 
 ### 🏆 Collective Insights
-- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy.
+- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy (A best: 98.81%).
 - Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.
-- Batch size: sweet spot at 64. Too small/large showed minor trade-offs.
+- Batch size: sweet spot at **64**. Too small/large showed minor trade-offs.
 - Activations: SiLU/GELU did not significantly outperform ReLU.
-- **Best overall:** `C_bs_sweep_sgd_onecycle_bs64` → 99.52% @ epoch 18, 15,882 params.
+- **Best overall:** `C_bs_sweep_sgd_onecycle_bs64` → **99.52%** (val loss **0.0151**) @ epoch **18/20**, **15,882** params. Config: Optimizer=sgd, Scheduler=onecycle, Activation=relu, BatchSize=64.
+- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, TinyMNISTNet (≈15,882 parameters) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **99.52%**.
 
 
 ---

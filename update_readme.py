@@ -307,18 +307,17 @@ def prettify_label(exp: str) -> str:
     s = s.replace("_drop", " d")
 
     return s
-
 def build_dynamic_conclusions(df: pd.DataFrame) -> str:
     """
-    Build a narrative Conclusions section directly from the CSV.
-    Mirrors the human-written summary:
-      - BN/Dropout importance (A vs others)
-      - Optimizer+scheduler highlights
-      - Batch-size sweep takeaways
-      - Activations block
-      - Best overall run (name + stats)
-      - Final takeaway with typical params
-    """
+    #     Build a narrative Conclusions section directly from the CSV.
+    #     Mirrors the human-written summary:
+    #       - BN/Dropout importance (A vs others)
+    #       - Optimizer+scheduler highlights
+    #       - Batch-size sweep takeaways
+    #       - Activations block
+    #       - Best overall run (name + stats)
+    #       - Final takeaway with typical params
+    #     """
     if df is None or df.empty:
         return "## Conclusions\n\n_Results not available._\n"
 
@@ -328,7 +327,7 @@ def build_dynamic_conclusions(df: pd.DataFrame) -> str:
         if col in d.columns:
             d[col] = pd.to_numeric(d[col], errors="coerce")
 
-    # Overall best
+    # Overall best (same rule used elsewhere)
     best = _best_by_sort(d)
     best_name = str(best.get("exp_name", "")) if best is not None else ""
     best_acc = format_float(best.get("val_acc"), 2) if best is not None else ""
@@ -336,12 +335,16 @@ def build_dynamic_conclusions(df: pd.DataFrame) -> str:
     best_params = f"{int(best['params']):,}" if (best is not None and not pd.isna(best.get('params'))) else ""
     best_ep = str(int(best["best_epoch"])) if (best is not None and not pd.isna(best.get("best_epoch"))) else ""
     best_epochs = str(int(best["epochs"])) if (best is not None and not pd.isna(best.get("epochs"))) else ""
+    best_opt = str(best.get("optimizer")) if best is not None else ""
+    best_sched = str(best.get("scheduler")) if best is not None else ""
+    best_act = str(best.get("activation")) if best is not None else ""
+    best_bs_run = int(best.get("batch_size")) if (best is not None and not pd.isna(best.get("batch_size"))) else None  # best run's BS
 
     # Typical params for the final line
     tp = typical_param_count(d)
     tp_str = f"≈{tp:,} parameters" if tp else "<20k parameters"
 
-    # ≥99.40% count (within ≤20 epochs if you want to enforce)
+    # ≥99.40% count (optionally you could also filter epochs<=20 if desired)
     reached = d[(d["val_acc"] >= 99.40)]
     n_reached = int(reached.shape[0]) if not reached.empty else 0
 
@@ -357,7 +360,7 @@ def build_dynamic_conclusions(df: pd.DataFrame) -> str:
 
     # B (optimizers)
     def _best_for(opt: str, sch: str) -> Optional[pd.Series]:
-        dd = B[(B["optimizer"].astype(str)==opt) & (B["scheduler"].astype(str)==sch)]
+        dd = B[(B["optimizer"].astype(str) == opt) & (B["scheduler"].astype(str) == sch)]
         return _best_by_sort(dd) if not dd.empty else None
 
     b_sgd_1cyc = _best_for("sgd", "onecycle")
@@ -365,102 +368,248 @@ def build_dynamic_conclusions(df: pd.DataFrame) -> str:
     b_adamw_step = _best_for("adamw", "step")
     b_rms_plateau = _best_for("rmsprop", "plateau")
 
-    # C (batch sizes)
+    # C (batch sizes): best per BS, then best among them
     c_best = _best_by_sort(C) if not C.empty else None
-    # best batch size by peak val_acc (tie break by same rule)
-    best_bs = None
+    best_bs_size_c = None
     if not C.empty:
-        # take best per batch_size
-        per_bs = []
-        for bs, grp in C.groupby("batch_size"):
+        per_bs_rows = []
+        for _, grp in C.groupby("batch_size"):
             row = _best_by_sort(grp)
             if row is not None:
-                per_bs.append(row)
-        if per_bs:
-            per_bs_df = pd.DataFrame(per_bs)
+                per_bs_rows.append(row)
+        if per_bs_rows:
+            per_bs_df = pd.DataFrame(per_bs_rows)
             row_bs = _best_by_sort(per_bs_df)
             if row_bs is not None and not pd.isna(row_bs.get("batch_size")):
-                best_bs = int(row_bs["batch_size"])
+                best_bs_size_c = int(row_bs["batch_size"])
 
     # D (activations)
     d_best = _best_by_sort(D) if not D.empty else None
-    # highlight best activation under D_
     d_act = str(d_best.get("activation")) if d_best is not None else None
     d_acc = format_float(d_best.get("val_acc"), 2) if d_best is not None else None
 
-    # Compose narrative bullets
-    bullets = []
+    # Build markdown with the long-form sections you wanted
+    md = ["## Conclusions\n\n"]
 
-    # BN + Dropout importance
-    if a_acc is not None:
-        bullets.append(f"- **BN + Dropout are critical:** the baseline (A) peaked at **{a_acc}%**, while BN/Dropout runs exceeded **99.4%** ({n_reached} runs).")
+    # A
+    md.append("### A. Baseline (no BN/Dropout, vanilla SGD)\n")
+    if a_best is not None:
+        md.append(f"- `{a_best['exp_name']}` peaked at **{a_acc}%** with {int(a_best['params'])} params.\n")
+        md.append("  → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.\n\n")
     else:
-        bullets.append("- **BN + Dropout are critical:** BN/Dropout runs exceeded **99.4%** in multiple cases; the no-BN/Dropout baseline was not competitive.")
+        md.append("- Baseline results not present.\n\n")
 
-    # Optimizers highlight
-    opt_lines = []
+    # B
+    md.append("### B. BN + Dropout + Optimizers\n")
     if b_adam_1cyc is not None:
-        opt_lines.append(f"**Adam + OneCycleLR** up to **{format_float(b_adam_1cyc['val_acc'], 2)}%**")
+        md.append(f"- Adam OneCycle best: `{b_adam_1cyc['exp_name']}` → **{format_float(b_adam_1cyc['val_acc'], 2)}%** (val loss {format_float(b_adam_1cyc['val_loss'], 4)}).\n")
     if b_adamw_step is not None:
-        opt_lines.append(f"**AdamW + StepLR** up to **{format_float(b_adamw_step['val_acc'], 2)}%**")
+        md.append(f"- AdamW StepLR strong: `{b_adamw_step['exp_name']}` → **{format_float(b_adamw_step['val_acc'], 2)}%**, faster convergence (best epoch {int(b_adamw_step['best_epoch'])}).\n")
     if b_sgd_1cyc is not None:
-        opt_lines.append(f"**SGD + OneCycleLR** up to **{format_float(b_sgd_1cyc['val_acc'], 2)}%**")
+        md.append(f"- SGD OneCycle: `{b_sgd_1cyc['exp_name']}` → **{format_float(b_sgd_1cyc['val_acc'], 2)}%**.\n")
     if b_rms_plateau is not None:
-        opt_lines.append(f"**RMSprop + ReduceLROnPlateau** around **{format_float(b_rms_plateau['val_acc'], 2)}%**")
+        md.append(f"- RMSprop Plateau weaker, around **{format_float(b_rms_plateau['val_acc'], 2)}%**.\n")
+    md.append("\n")
 
-    if opt_lines:
-        bullets.append("- **Optimizers:** " + "; ".join(opt_lines) + ".")
-    else:
-        bullets.append("- **Optimizers:** Adaptive methods (Adam/AdamW) and SGD+OneCycleLR were generally strong; RMSprop lagged.")
+    # C
+    md.append("### C. BN + Dropout + Batch-Size Sweep\n")
+    if c_best is not None:
+        md.append(f"- Best overall run (within C): `{c_best['exp_name']}` → **{format_float(c_best['val_acc'], 2)}%** (val loss {format_float(c_best['val_loss'], 4)}).\n")
+    if best_bs_size_c is not None:
+        md.append(f"- Batch size sweet spot at **{best_bs_size_c}**: stable convergence and top accuracy.\n")
+    md.append("\n")
 
-    # Batch-size sweep takeaway
-    if best_bs is not None and c_best is not None:
-        bullets.append(f"- **Batch-size sweep (C):** best results clustered at **bs={best_bs}**, with the top C-run reaching **{format_float(c_best['val_acc'], 2)}%**.")
-    elif c_best is not None:
-        bullets.append(f"- **Batch-size sweep (C):** top C-run reached **{format_float(c_best['val_acc'], 2)}%**.")
-    else:
-        bullets.append("- **Batch-size sweep (C):** results not available.")
-
-    # Activations
+    # D
+    md.append("### D. BN + Dropout + Activations\n")
     if d_act is not None and d_acc is not None:
-        bullets.append(f"- **Activations (D):** differences were modest on MNIST; best was **{d_act}** at **{d_acc}%** (under AdamW+StepLR).")
-    else:
-        bullets.append("- **Activations (D):** differences were modest on MNIST.")
+        md.append(f"- Best activation: **{d_act}** → **{d_acc}%** (under AdamW+StepLR).\n")
+    md.append("- Differences modest on MNIST (<0.1%).\n\n")
 
-    # Final takeaway / best run
+    # Collective insights and Best overall
+    md.append("### 🏆 Collective Insights\n")
+    if a_acc is not None:
+        md.append(f"- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy (A best: {a_acc}%).\n")
+    else:
+        md.append("- BN + Dropout mandatory — baseline A lagged substantially.\n")
+    md.append("- Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.\n")
+    if best_bs_size_c is not None:
+        md.append(f"- Batch size: sweet spot at **{best_bs_size_c}**. Too small/large showed minor trade-offs.\n")
+    else:
+        md.append("- Batch size: mid-range values provided the best trade-off.\n")
+    md.append("- Activations: SiLU/GELU did not significantly outperform ReLU.\n")
+
     if best is not None:
-        bullets.append(
+        md.append(
             f"- **Best overall:** `{best_name}` → **{best_acc}%** (val loss **{best_loss}**) "
-            f"by epoch **{best_ep}** / {best_epochs}, **{best_params}** params."
+            f"@ epoch **{best_ep}/{best_epochs}**, **{best_params}** params. "
+            f"Config: Optimizer={best_opt}, Scheduler={best_sched}, Activation={best_act}, BatchSize={best_bs_run}.\n"
         )
-        bullets.append(
+        md.append(
             f"- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, "
-            f"TinyMNISTNet ({tp_str}) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **{best_acc}%**."
+            f"TinyMNISTNet ({tp_str}) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **{best_acc}%**.\n"
         )
-    conclusion_md = [
-    "## Conclusions\n",
-    "### A. Baseline (no BN/Dropout, vanilla SGD)\n",
-    f"- `{a_best['exp_name']}` peaked at **{a_acc}%** with {int(a_best['params'])} params.\n"
-    "  → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.\n\n",
-    "### B. BN + Dropout + Optimizers\n",
-    f"- Adam OneCycle best: `{b_adam_1cyc['exp_name']}` → **{format_float(b_adam_1cyc['val_acc'], 2)}%** (val loss {format_float(b_adam_1cyc['val_loss'], 4)}).\n"
-    f"- AdamW StepLR strong: `{b_adamw_step['exp_name']}` → **{format_float(b_adamw_step['val_acc'], 2)}%**, faster convergence (best epoch {int(b_adamw_step['best_epoch'])}).\n"
-    f"- SGD OneCycle: `{b_sgd_1cyc['exp_name']}` → **{format_float(b_sgd_1cyc['val_acc'], 2)}%**.\n"
-    f"- RMSprop Plateau weaker, around {format_float(b_rms_plateau['val_acc'], 2)}%.\n\n",
-    "### C. BN + Dropout + Batch-Size Sweep\n",
-    f"- Best overall run: `{best_name}` → **{best_acc}%** (val loss {best_loss}) at epoch {best_ep}/{best_epochs}, {best_params} params.\n"
-    f"- Batch size sweet spot at **{best_bs}**: stable convergence and top accuracy.\n\n",
-    "### D. BN + Dropout + Activations\n",
-    f"- Best activation: {d_act} → **{d_acc}%** (under AdamW+StepLR).\n"
-    "- Differences modest on MNIST (<0.1%).\n\n",
-    "### 🏆 Collective Insights\n",
-    "- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy.\n"
-    "- Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.\n"
-    "- Batch size: sweet spot at 64. Too small/large showed minor trade-offs.\n"
-    "- Activations: SiLU/GELU did not significantly outperform ReLU.\n"
-    f"- **Best overall:** `{best_name}` → {best_acc}% @ epoch {best_ep}, {best_params} params.\n"
-]
-    return "".join(conclusion_md)
+
+    return "".join(md)
+
+# def build_dynamic_conclusions(df: pd.DataFrame) -> str:
+#     """
+#     Build a narrative Conclusions section directly from the CSV.
+#     Mirrors the human-written summary:
+#       - BN/Dropout importance (A vs others)
+#       - Optimizer+scheduler highlights
+#       - Batch-size sweep takeaways
+#       - Activations block
+#       - Best overall run (name + stats)
+#       - Final takeaway with typical params
+#     """
+#     if df is None or df.empty:
+#         return "## Conclusions\n\n_Results not available._\n"
+
+#     d = df.copy()
+#     # normalize types
+#     for col in ("val_acc", "val_loss", "params", "epochs", "best_epoch", "train_time_sec", "batch_size"):
+#         if col in d.columns:
+#             d[col] = pd.to_numeric(d[col], errors="coerce")
+
+#     # Overall best
+#     best = _best_by_sort(d)
+#     best_name = str(best.get("exp_name", "")) if best is not None else ""
+#     best_acc = format_float(best.get("val_acc"), 2) if best is not None else ""
+#     best_loss = format_float(best.get("val_loss"), 4) if best is not None else ""
+#     best_params = f"{int(best['params']):,}" if (best is not None and not pd.isna(best.get('params'))) else ""
+#     best_ep = str(int(best["best_epoch"])) if (best is not None and not pd.isna(best.get("best_epoch"))) else ""
+#     best_epochs = str(int(best["epochs"])) if (best is not None and not pd.isna(best.get("epochs"))) else ""
+
+#     # Typical params for the final line
+#     tp = typical_param_count(d)
+#     tp_str = f"≈{tp:,} parameters" if tp else "<20k parameters"
+
+#     # ≥99.40% count (within ≤20 epochs if you want to enforce)
+#     reached = d[(d["val_acc"] >= 99.40)]
+#     n_reached = int(reached.shape[0]) if not reached.empty else 0
+
+#     # Block splits by exp_name prefix
+#     A = d[d["exp_name"].astype(str).str.startswith("A_")]
+#     B = d[d["exp_name"].astype(str).str.startswith("B_")]
+#     C = d[d["exp_name"].astype(str).str.startswith("C_")]
+#     D = d[d["exp_name"].astype(str).str.startswith("D_")]
+
+#     # A (baseline)
+#     a_best = _best_by_sort(A) if not A.empty else None
+#     a_acc = format_float(a_best.get("val_acc"), 2) if a_best is not None else None
+
+#     # B (optimizers)
+#     def _best_for(opt: str, sch: str) -> Optional[pd.Series]:
+#         dd = B[(B["optimizer"].astype(str)==opt) & (B["scheduler"].astype(str)==sch)]
+#         return _best_by_sort(dd) if not dd.empty else None
+
+#     b_sgd_1cyc = _best_for("sgd", "onecycle")
+#     b_adam_1cyc = _best_for("adam", "onecycle")
+#     b_adamw_step = _best_for("adamw", "step")
+#     b_rms_plateau = _best_for("rmsprop", "plateau")
+
+#     # C (batch sizes)
+#     c_best = _best_by_sort(C) if not C.empty else None
+#     # best batch size by peak val_acc (tie break by same rule)
+#     best_bs = None
+#     if not C.empty:
+#         # take best per batch_size
+#         per_bs = []
+#         for bs, grp in C.groupby("batch_size"):
+#             row = _best_by_sort(grp)
+#             if row is not None:
+#                 per_bs.append(row)
+#         if per_bs:
+#             per_bs_df = pd.DataFrame(per_bs)
+#             row_bs = _best_by_sort(per_bs_df)
+#             if row_bs is not None and not pd.isna(row_bs.get("batch_size")):
+#                 best_bs = int(row_bs["batch_size"])
+
+#     # D (activations)
+#     d_best = _best_by_sort(D) if not D.empty else None
+#     # highlight best activation under D_
+#     d_act = str(d_best.get("activation")) if d_best is not None else None
+#     d_acc = format_float(d_best.get("val_acc"), 2) if d_best is not None else None
+
+#     # Compose narrative bullets
+#     bullets = []
+
+#     # BN + Dropout importance
+#     if a_acc is not None:
+#         bullets.append(f"- **BN + Dropout are critical:** the baseline (A) peaked at **{a_acc}%**, while BN/Dropout runs exceeded **99.4%** ({n_reached} runs).")
+#     else:
+#         bullets.append("- **BN + Dropout are critical:** BN/Dropout runs exceeded **99.4%** in multiple cases; the no-BN/Dropout baseline was not competitive.")
+
+#     # Optimizers highlight
+#     opt_lines = []
+#     if b_adam_1cyc is not None:
+#         opt_lines.append(f"**Adam + OneCycleLR** up to **{format_float(b_adam_1cyc['val_acc'], 2)}%**")
+#     if b_adamw_step is not None:
+#         opt_lines.append(f"**AdamW + StepLR** up to **{format_float(b_adamw_step['val_acc'], 2)}%**")
+#     if b_sgd_1cyc is not None:
+#         opt_lines.append(f"**SGD + OneCycleLR** up to **{format_float(b_sgd_1cyc['val_acc'], 2)}%**")
+#     if b_rms_plateau is not None:
+#         opt_lines.append(f"**RMSprop + ReduceLROnPlateau** around **{format_float(b_rms_plateau['val_acc'], 2)}%**")
+
+#     if opt_lines:
+#         bullets.append("- **Optimizers:** " + "; ".join(opt_lines) + ".")
+#     else:
+#         bullets.append("- **Optimizers:** Adaptive methods (Adam/AdamW) and SGD+OneCycleLR were generally strong; RMSprop lagged.")
+
+#     # Batch-size sweep takeaway
+#     if best_bs is not None and c_best is not None:
+#         bullets.append(f"- **Batch-size sweep (C):** best results clustered at **bs={best_bs}**, with the top C-run reaching **{format_float(c_best['val_acc'], 2)}%**.")
+#     elif c_best is not None:
+#         bullets.append(f"- **Batch-size sweep (C):** top C-run reached **{format_float(c_best['val_acc'], 2)}%**.")
+#     else:
+#         bullets.append("- **Batch-size sweep (C):** results not available.")
+
+#     # Activations
+#     if d_act is not None and d_acc is not None:
+#         bullets.append(f"- **Activations (D):** differences were modest on MNIST; best was **{d_act}** at **{d_acc}%** (under AdamW+StepLR).")
+#     else:
+#         bullets.append("- **Activations (D):** differences were modest on MNIST.")
+
+#     # Final takeaway / best run
+#     if best is not None:
+#         bullets.append(
+#             f"- **Best overall:** `{best_name}` → **{best_acc}%** (val loss **{best_loss}**) "
+#             f"by epoch **{best_ep}** / {best_epochs}, **{best_params}** params."
+#         )
+#         bullets.append(
+#             f"- **Final takeaway:** With BN + Dropout, thoughtful scheduling (e.g., OneCycleLR/StepLR), and a good batch size, "
+#             f"TinyMNISTNet ({tp_str}) reliably reaches **≥99.4% within 20 epochs**; the best run achieved **{best_acc}%**."
+#         )
+#     best_opt = str(best_row['optimizer'])
+#     best_sched = str(best_row['scheduler'])
+#     best_act = str(best_row['activation'])
+#     best_bs = int(best_row['batch_size'])
+#     conclusion_md = [
+#     "## Conclusions\n",
+#     "### A. Baseline (no BN/Dropout, vanilla SGD)\n",
+#     f"- `{a_best['exp_name']}` peaked at **{a_acc}%** with {int(a_best['params'])} params.\n"
+#     "  → Clear gap vs. BN+Dropout variants, confirms normalization/regularization are essential.\n\n",
+#     "### B. BN + Dropout + Optimizers\n",
+#     f"- Adam OneCycle best: `{b_adam_1cyc['exp_name']}` → **{format_float(b_adam_1cyc['val_acc'], 2)}%** (val loss {format_float(b_adam_1cyc['val_loss'], 4)}).\n"
+#     f"- AdamW StepLR strong: `{b_adamw_step['exp_name']}` → **{format_float(b_adamw_step['val_acc'], 2)}%**, faster convergence (best epoch {int(b_adamw_step['best_epoch'])}).\n"
+#     f"- SGD OneCycle: `{b_sgd_1cyc['exp_name']}` → **{format_float(b_sgd_1cyc['val_acc'], 2)}%**.\n"
+#     f"- RMSprop Plateau weaker, around {format_float(b_rms_plateau['val_acc'], 2)}%.\n\n",
+#     "### C. BN + Dropout + Batch-Size Sweep\n",
+#     f"- Best overall run: `{best_name}` → **{best_acc}%** (val loss {best_loss}) at epoch {best_ep}/{best_epochs}, {best_params} params.\n"
+#     f"- Batch size sweet spot at **{best_bs}**: stable convergence and top accuracy.\n\n",
+#     "### D. BN + Dropout + Activations\n",
+#     f"- Best activation: {d_act} → **{d_acc}%** (under AdamW+StepLR).\n"
+#     "- Differences modest on MNIST (<0.1%).\n\n",
+#     "### 🏆 Collective Insights\n",
+#     "- BN + Dropout mandatory — baseline A lagged by ~0.6–0.7% absolute accuracy.\n"
+#     "- Optimizers: Adam OneCycle and AdamW StepLR were most reliable; RMSprop lagged.\n"
+#     "- Batch size: sweet spot at 64. Too small/large showed minor trade-offs.\n"
+#     "- Activations: SiLU/GELU did not significantly outperform ReLU.\n"
+#     #f"- **Best overall:** `{best_name}` → {best_acc}% @ epoch {best_ep}, {best_params} params.\n"
+#     f"- **Best overall:** `{best_name}` → {best_acc}% (val loss {best_loss}) @ epoch {best_ep}/{best_epochs}, {best_params} params. "
+#     f"Config: Optimizer={best_opt}, Scheduler={best_sched}, Activation={best_act}, BatchSize={best_bs}.\n"
+# ]
+#     return "".join(conclusion_md)
 
     #return "## Conclusions\n\n" + "\n".join(bullets) + "\n"
 
@@ -602,36 +751,22 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
         if tr_loss_col and pd.api.types.is_numeric_dtype(ep_df[tr_loss_col]):
             series_tr_loss.append((label, ep_df[epoch_col], ep_df[tr_loss_col]))
 
-    # Helper to plot lists
-    # def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
-    #     if not series_list:
-    #         return False
-    #     plt.figure()
-    #     for label, x, y in series_list:
-    #         try:
-    #             plt.plot(x.values, y.values, label=label)
-    #         except Exception:
-    #             continue
-    #     plt.title(title)
-    #     plt.xlabel(xlabel)
-    #     plt.ylabel(ylabel)
-    #     plt.legend(loc="best", fontsize="small", ncol=1)
-    #     plt.grid(True, alpha=0.3)
-    #     # Save
-    #     out_file = REPO_ROOT / save_as
-    #     out_file.parent.mkdir(parents=True, exist_ok=True)
-    #     plt.tight_layout()
-    #     plt.savefig(out_file, dpi=150)
-    #     plt.close()
-    #     return True
-    def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
+    def _plot_series(
+    series_list: List[Tuple[str, pd.Series, pd.Series]],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    save_as: str,
+    legend_inside: bool = False,
+    figsize: Tuple[int, int] = (10, 6),
+) -> bool:
         if not series_list:
             return False
 
-        fig, ax = plt.subplots(figsize=(10, 6))  # bigger canvas
+        fig, ax = plt.subplots(figsize=figsize)
         for label, x, y in series_list:
             try:
-                ax.plot(x.values, y.values, label=label, linewidth=1.5)
+                ax.plot(x.values, y.values, label=label, linewidth=1.8)
             except Exception:
                 continue
 
@@ -639,25 +774,73 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.3)
+        ax.margins(x=0)
 
-        # Legend outside, auto columns
-        ncol = 2 if len(series_list) > 4 else 1
-        ax.legend(
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
-            fontsize="small",
-            frameon=False,
-            ncol=ncol,
-            borderaxespad=0.0
-        )
-
-        fig.tight_layout(rect=[0, 0, 0.80, 1])  # leave room on right for legend
+        if legend_inside:
+            # Put legend inside top-right for compact Top-5 plots
+            ax.legend(
+                loc="upper right",
+                fontsize="small",
+                frameon=True,
+                framealpha=0.9,
+                borderpad=0.4,
+                handlelength=2.0,
+            )
+            fig.tight_layout()
+        else:
+            # Keep legend outside for “ALL experiments” to reduce clutter
+            ncol = 2 if len(series_list) > 4 else 1
+            ax.legend(
+                loc="center left",
+                bbox_to_anchor=(1.02, 0.5),
+                fontsize="small",
+                frameon=False,
+                ncol=ncol,
+                borderaxespad=0.0,
+                handlelength=2.0,
+            )
+            fig.tight_layout(rect=[0, 0, 0.80, 1])  # room on right
 
         out_file = REPO_ROOT / save_as
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_file, dpi=150)
+        fig.savefig(out_file, dpi=170)
         plt.close(fig)
         return True
+
+    # def _plot_series(series_list: List[Tuple[str, pd.Series, pd.Series]], title: str, xlabel: str, ylabel: str, save_as: str) -> bool:
+    #     if not series_list:
+    #         return False
+
+    #     fig, ax = plt.subplots(figsize=(10, 6))  # bigger canvas
+    #     for label, x, y in series_list:
+    #         try:
+    #             ax.plot(x.values, y.values, label=label, linewidth=1.5)
+    #         except Exception:
+    #             continue
+
+    #     ax.set_title(title)
+    #     ax.set_xlabel(xlabel)
+    #     ax.set_ylabel(ylabel)
+    #     ax.grid(True, alpha=0.3)
+
+    #     # Legend outside, auto columns
+    #     ncol = 2 if len(series_list) > 4 else 1
+    #     ax.legend(
+    #         loc="center left",
+    #         bbox_to_anchor=(1.02, 0.5),
+    #         fontsize="small",
+    #         frameon=False,
+    #         ncol=ncol,
+    #         borderaxespad=0.0
+    #     )
+
+    #     fig.tight_layout(rect=[0, 0, 0.80, 1])  # leave room on right for legend
+
+    #     out_file = REPO_ROOT / save_as
+    #     out_file.parent.mkdir(parents=True, exist_ok=True)
+    #     fig.savefig(out_file, dpi=150)
+    #     plt.close(fig)
+    #     return True
 
 
     # # Generate plots
@@ -673,10 +856,49 @@ def generate_combined_plots(df: pd.DataFrame) -> Dict[str, str]:
     has_tr_loss_all = _plot_series(series_tr_loss_all, "Training Loss vs Epoch (All Experiments)",      "Epoch", "Train Loss", out_paths_all["train_loss"])
 
     # Then: TOP-5 only
-    has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (Top 5 Experiments)", "Epoch", "Val Accuracy", out_paths_top5["val_acc"])
-    has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (Top 5 Experiments)", "Epoch", "Val Loss", out_paths_top5["val_loss"])
-    has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (Top 5 Experiments)",  "Epoch", "Train Accuracy", out_paths_top5["train_acc"])
-    has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (Top 5 Experiments)",      "Epoch", "Train Loss", out_paths_top5["train_loss"])
+    # has_val_acc = _plot_series(series_val_acc, "Validation Accuracy vs Epoch (Top 5 Experiments)", "Epoch", "Val Accuracy", out_paths_top5["val_acc"])
+    # has_val_loss = _plot_series(series_val_loss, "Validation Loss vs Epoch (Top 5 Experiments)", "Epoch", "Val Loss", out_paths_top5["val_loss"])
+    # has_tr_acc  = _plot_series(series_tr_acc,  "Training Accuracy vs Epoch (Top 5 Experiments)",  "Epoch", "Train Accuracy", out_paths_top5["train_acc"])
+    # has_tr_loss = _plot_series(series_tr_loss, "Training Loss vs Epoch (Top 5 Experiments)",      "Epoch", "Train Loss", out_paths_top5["train_loss"])
+
+    # Then: TOP-5 only (legend inside, slightly larger figsize)
+    has_val_acc = _plot_series(
+        series_val_acc,
+        "Validation Accuracy vs Epoch (Top 5 Experiments)",
+        "Epoch",
+        "Val Accuracy",
+        out_paths_top5["val_acc"],
+        legend_inside=True,
+        figsize=(11, 7),
+    )
+    has_val_loss = _plot_series(
+        series_val_loss,
+        "Validation Loss vs Epoch (Top 5 Experiments)",
+        "Epoch",
+        "Val Loss",
+        out_paths_top5["val_loss"],
+        legend_inside=True,
+        figsize=(11, 7),
+    )
+    has_tr_acc  = _plot_series(
+        series_tr_acc,
+        "Training Accuracy vs Epoch (Top 5 Experiments)",
+        "Epoch",
+        "Train Accuracy",
+        out_paths_top5["train_acc"],
+        legend_inside=True,
+        figsize=(11, 7),
+    )
+    has_tr_loss = _plot_series(
+        series_tr_loss,
+        "Training Loss vs Epoch (Top 5 Experiments)",
+        "Epoch",
+        "Train Loss",
+        out_paths_top5["train_loss"],
+        legend_inside=True,
+        figsize=(11, 7),
+    )
+
 
 
 
